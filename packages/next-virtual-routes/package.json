@@ -1,17 +1,32 @@
 {
   "name": "next-virtual-routes",
   "version": "0.1.0",
+  "description": "React Router v7 virtual file routes on Next.js.",
+  "author": {
+    "name": "Carlo Domínguez",
+    "email": "hello@carlo.works",
+    "url": "https://carlo.works"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/carloitaben/next-virtual-routes.git",
+    "directory": "packages/next-virtual-routes"
+  },
+  "homepage": "https://github.com/carloitaben/next-virtual-routes/tree/main/packages/next-virtual-routes#readme",
+  "license": "MIT",
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "keywords": [
-    "nextjs",
-    "react",
-    "programmatic",
-    "code-based",
-    "routes"
+    "next",
+    "next.js",
+    "programmatic routes",
+    "code-based routes",
+    "app router"
   ],
   "exports": {
     "./package.json": "./package.json",
