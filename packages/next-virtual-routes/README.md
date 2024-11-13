@@ -4,9 +4,9 @@ React Router v7 [virtual file routes](https://www.youtube.com/watch?v=fjTX8hQTlE
 
 ## Features
 
-- Programatically generate [App Router files](https://nextjs.org/docs/app/building-your-application/routing#file-conventions).
-- Reusable file templates.
+- Programatically generate any [Next.js App Router file](https://nextjs.org/docs/app/building-your-application/routing#file-conventions).
 - Mix and match with file-based routing for incremental adoption.
+- Reusable file templates.
 - Fully typesafe.
 
 ## Installation
