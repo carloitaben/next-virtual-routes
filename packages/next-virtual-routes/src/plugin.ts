@@ -1,13 +1,6 @@
 import type { NextConfig } from "next"
 import { join } from "path"
-import {
-  ensureDir,
-  readFile,
-  writeFile,
-  exists,
-  ensureFile,
-  emptydir,
-} from "fs-extra"
+import { readFile, writeFile, exists, ensureFile, emptydir } from "fs-extra"
 import { createHash } from "crypto"
 // import { parse } from "acorn"
 // import { walk } from "estree-walker"
@@ -76,12 +69,12 @@ export async function generateRoutes(routes: RoutesDefinition) {
     console.warn("TODO: warn routes is empty")
     return
   }
+  
+  const hashPath = join(
+    process.cwd(),
+    "node_modules/next-virtual-routes/.cache"
+  )
 
-  const generatedRoutesDirectory = join(process.cwd(), "src/app/(virtual)")
-  debug(`ensuring virtual directory at ${generatedRoutesDirectory}`)
-  await ensureDir(generatedRoutesDirectory)
-
-  const hashPath = join(generatedRoutesDirectory, ".cache")
   debug(`ensuring cache file at ${hashPath}`)
   await ensureFile(hashPath)
 
@@ -98,9 +91,11 @@ export async function generateRoutes(routes: RoutesDefinition) {
   }
 
   const now = new Date().getTime()
+  // TODO: detect `src` directory. Maybe we could just glob the path
+  const appDirectory = join(process.cwd(), "src/app")
 
   debug("cache MISS. Cleaning virtual directory")
-  emptydir(generatedRoutesDirectory)
+  emptydir(appDirectory)
 
   debug("Writing cache hash")
   writeFile(hashPath, hash, { encoding: "hex" })
@@ -135,7 +130,7 @@ export async function generateRoutes(routes: RoutesDefinition) {
       return
     }
 
-    const virtualRoutePath = join(generatedRoutesDirectory, route.path)
+    const virtualRoutePath = join(appDirectory, route.path)
 
     const routeContext = {
       filename: virtualRoutePath,
@@ -239,7 +234,7 @@ export async function generateRoutes(routes: RoutesDefinition) {
   // TODO: make this check green like nextjs does
   console.log(` ✓ Generated ${result.length} virtual routes in ${end - now}ms`)
   console.log("")
-  console.log("(virtual)")
+  console.log("app")
   printTree(tree)
   console.log("")
 }

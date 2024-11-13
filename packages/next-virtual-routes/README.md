@@ -48,9 +48,6 @@ export default async () => {
 }
 ```
 
-> [!TIP]
-> You can optionally add `(virtual)/` to your `.gitignore` file if your virtual routes depend on frequently changing data.
-
 ## Usage
 
 Call `route` in your routes configuration to programatically create a route file.
@@ -79,13 +76,13 @@ export function Page() {
 > [!TIP]
 > Templates can be either a file or a directory with an `index.ts` file inside.
 
-This generates the `/src/app/(generated)/blog/page.tsx` file with the following content:
+This generates the `/src/app/blog/page.tsx` file with the following content:
 
 ```ts
-// src/app/(generated)/blog/page.tsx
+// src/app/blog/page.tsx
 
 const route = {
-  filename: "src/app/(generated)/blog/page.tsx",
+  filename: "src/app/blog/page.tsx",
   context: {},
 }
 
@@ -157,10 +154,10 @@ Statically analyzable expressions are evaluated when applying the template.
 The previous template generates the following content:
 
 ```ts
-// src/app/(generated)/home/page.tsx
+// src/app/home/page.tsx
 
 const route = {
-  filename: "src/app/(generated)/home/page.tsx",
+  filename: "src/app/home/page.tsx",
   context: {
     static: true,
   },
@@ -172,10 +169,10 @@ export function Page() {
   return "Static rendering"
 }
 
-// src/app/(generated)/about/page.tsx
+// src/app/about/page.tsx
 
 const route = {
-  filename: "src/app/(generated)/about/page.tsx",
+  filename: "src/app/about/page.tsx",
   context: {
     static: false,
   },
