@@ -1,8 +1,15 @@
+const route = {
+  "filename": "/Users/carloitaben/Developer/next-virtual-routes/examples/i18n/src/app/en/layout.tsx",
+  "context": {
+    "language": "en"
+  }
+}
+
 import type { Metadata } from "next"
 import "@/globals.css"
 
 export const metadata: Metadata = {
-  title: route.context.language,
+  title: "en",
 }
 
 export default function RootLayout({
@@ -11,9 +18,9 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang={route.context.language}>
+    <html lang={"en"}>
       <body>
-        <h1>Language: {route.context.language}</h1>
+        <h1>Language: {"en"}</h1>
         {children}
       </body>
     </html>

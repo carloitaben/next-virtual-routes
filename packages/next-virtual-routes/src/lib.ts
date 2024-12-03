@@ -9,6 +9,14 @@ declare global {
   }
 }
 
+/**
+ * TODO: document
+ */
+export type RouteContext = {
+  filename: string
+  context?: Context
+}
+
 type RouteFileConvention =
   | "apple-icon"
   | "default"
@@ -36,6 +44,9 @@ type RouteFilePath =
   | `${RouteFileConvention}.${RouteFileExtensions}`
   | `${string}/${RouteFileConvention}.${RouteFileExtensions}`
 
+/**
+ * TODO: document
+ */
 export type Route = {
   path: string
   template: string

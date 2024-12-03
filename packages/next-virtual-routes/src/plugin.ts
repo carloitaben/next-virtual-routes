@@ -2,14 +2,9 @@ import type { NextConfig } from "next"
 import { join } from "path"
 import { readFile, writeFile, exists, ensureFile, emptydir } from "fs-extra"
 import { createHash } from "crypto"
-// import { parse } from "acorn"
-// import { walk } from "estree-walker"
-// import MagicString from "magic-string"
-// import { analyze } from "periscopic"
-import type { Route } from "./lib.js"
+import type { Route, RouteContext } from "./lib.js"
 import { debug } from "./util.js"
-// import * as babelTypes from "@babel/types"
-// import generate from "@babel/generator"
+import { transform } from "./ast.js"
 
 function printTree(tree: any, prefix: string = ""): void {
   const keys = Object.keys(tree)
@@ -24,32 +19,17 @@ function printTree(tree: any, prefix: string = ""): void {
 type RoutesDefinition = Route[] | (() => Route[] | Promise<Route[]>)
 
 type PluginRoutesConfig = {
+  // routes:
+  //   | RoutesDefinition
+  //   | {
+  //       config: RoutesDefinition
+  //       cacheMaxAge?: number
+  //       banner?: string[]
+  //       strict?: boolean
+  //       formatter?: "prettier" | "biome"
+  //     }
   routes: RoutesDefinition
 }
-
-// function evaluateExpression(node) {
-//   if (node.type === "Literal") {
-//     return node.value // Return the literal value
-//   } else if (node.type === "BinaryExpression") {
-//     const left = evaluateExpression(node.left)
-//     const right = evaluateExpression(node.right)
-//     switch (node.operator) {
-//       case "+":
-//         return left + right
-//       case "-":
-//         return left - right
-//       case "*":
-//         return left * right
-//       case "/":
-//         return left / right
-//       case "===":
-//         return left === right
-//       default:
-//         return null // Unsupported operator
-//     }
-//   }
-//   return null // Handle other cases (UnaryExpression, CallExpression, etc.)
-// }
 
 type RouteTree = Record<
   string,
@@ -58,55 +38,81 @@ type RouteTree = Record<
   }
 >
 
+async function isCached(routes: Route[]) {
+  const hashPath = join(process.cwd(), ".next/next-virtual-routes/.cache")
+
+  debug(`ensuring cache file at ${hashPath}`)
+  await ensureFile(hashPath)
+
+  // @ts-expect-error
+  const lastHash = await readFile(hashPath, {
+    encoding: "hex",
+  })
+
+  const hashContent = JSON.stringify(
+    routes.sort((a, b) => (a.path > b.path ? 1 : -1))
+  )
+
+  const hash = createHash("sha1").update(hashContent).digest("hex")
+
+  // if (lastHash === hash) {
+  //   debug("cache HIT. Skipping route generation")
+  //   return true
+  // }
+
+  debug("Writing cache hash")
+  writeFile(hashPath, hash, {
+    encoding: "hex",
+  })
+
+  return false
+}
+
+async function getAppDirectory() {
+  const withSrc = join(process.cwd(), "src/app")
+  const withSrcExists = await exists(withSrc)
+
+  if (withSrcExists) {
+    return withSrc
+  }
+
+  const withoutSrc = join(process.cwd(), "app")
+  const withoutSrcExists = await exists(withoutSrc)
+
+  if (withoutSrcExists) {
+    return withoutSrc
+  }
+
+  throw Error("TODO: no hi ha app dir")
+}
+
 export async function generateRoutes(routes: RoutesDefinition) {
   debug("called generateRoutes()")
   debug("resolving routes config")
 
-  // TODO: use the resolved routes thing as a cache hash to prevent rerunning it during development
   const routesConfig = typeof routes === "function" ? await routes() : routes
 
   if (!routesConfig.length) {
     console.warn("TODO: warn routes is empty")
     return
   }
-  
-  const hashPath = join(
-    process.cwd(),
-    "node_modules/next-virtual-routes/.cache"
-  )
 
-  debug(`ensuring cache file at ${hashPath}`)
-  await ensureFile(hashPath)
+  const cached = await isCached(routesConfig)
 
-  const lastHash = await readFile(hashPath, { encoding: "hex" })
-  const hashContent = JSON.stringify(
-    routesConfig.sort((a, b) => (a.path > b.path ? 1 : -1))
-  )
-
-  const hash = createHash("sha1").update(hashContent).digest("hex")
-
-  if (lastHash === hash) {
-    debug("cache HIT. Skipping route generation")
+  if (cached) {
+    debug("Reusing cache")
     return
   }
 
   const now = new Date().getTime()
-  // TODO: detect `src` directory. Maybe we could just glob the path
-  const appDirectory = join(process.cwd(), "src/app")
+  const appDirectory = await getAppDirectory()
 
   debug("cache MISS. Cleaning virtual directory")
-  emptydir(appDirectory)
-
-  debug("Writing cache hash")
-  writeFile(hashPath, hash, { encoding: "hex" })
-
+  await emptydir(appDirectory)
   debug("starting route generation")
 
   const tree: RouteTree = {}
 
-  // TODO: accumulate promises instead of mapping
-  // - we can then skip the filtering of voids for counting routes
-  // - we can check if two routes are pointing to the same path
   const promises = routesConfig.map(async (route) => {
     debug(`processing route ${JSON.stringify(route)}`)
 
@@ -126,13 +132,12 @@ export async function generateRoutes(routes: RoutesDefinition) {
     const fsRouteExist = await exists(fsRoutePath)
 
     if (fsRouteExist) {
-      console.warn(`TODO: warn existing fs route "${route.path}"`)
-      return
+      return console.warn(`TODO: warn existing fs route "${route.path}"`)
     }
 
     const virtualRoutePath = join(appDirectory, route.path)
 
-    const routeContext = {
+    const routeContext: RouteContext = {
       filename: virtualRoutePath,
       context: route.context,
     }
@@ -140,74 +145,15 @@ export async function generateRoutes(routes: RoutesDefinition) {
     debug(`writing virtual route at ${virtualRoutePath}`)
     await ensureFile(virtualRoutePath)
     const templateCode = await readFile(templatePath, "utf-8")
-    // TODO: (AST) only inject route context if route global is accessed in `templateCode`
+
+    if (!templateCode) {
+      return console.warn("TODO: empty tempalte file")
+    }
+
     // TODO: (AST) inject route context after imports to make generated files less ugly
-
-    const template = [
-      `const route = ${JSON.stringify(routeContext)}`,
-      templateCode,
-    ].join("\n")
-
-    // TODO: (AST) statically analyze and evaluate AOT `route` global usage on `template`
-
+    const template = transform(templateCode, routeContext)
     await writeFile(virtualRoutePath, template)
     debug(`created virtual route at ${virtualRoutePath}`)
-
-    // const magicString = new MagicString(templateCode)
-
-    // const ast = parse(templateCode, {
-    //   ecmaVersion: "latest",
-    //   locations: true,
-    // })
-
-    // const analyzed = analyze(ast)
-
-    // console.log(analyzed)
-
-    // walk(ast, {
-    //   enter(node, parent) {
-    //     if (node.type === "Identifier" && node.name === "$context") {
-    //       const start = node.start
-    //       const end = node.end
-
-    //       // If $context is part of a conditional expression
-    //       if (parent.type === "ConditionalExpression") {
-    //         const condition = evaluateExpression(parent.test)
-    //         const replacement = condition ? '"baz"' : '"qux"'
-    //         magicString.overwrite(parent.start, parent.end, replacement)
-    //       } else {
-    //         // Replace the identifier with its value
-    //         magicString.overwrite(start, end, `"${contextValue}"`)
-    //       }
-    //     }
-    //   },
-    // })
-
-    // const resolveContextReferences = (node) => {
-    //   if (babelTypes.isIdentifier(node) && node.name === "$context") {
-    //     // Replace $context with the actual value based on the context
-    //     return babelTypes.valueToNode(contextValue.value)
-    //   }
-    //   return node
-    // }
-
-    // // Traverse the AST to find and replace global $context
-    // const traverseAndReplace = (node) => {
-    //   traverse(node, {
-    //     Identifier(path) {
-    //       if (path.node.name === "$context") {
-    //         // Check if $context is a global variable
-    //         const isGlobal = path.scope.hasOwnBinding("$context") === false // Check if it's a global binding
-    //         if (isGlobal) {
-    //           path.replaceWith(resolveContextReferences(path.node))
-    //         }
-    //       }
-    //     },
-    //   })
-    // }
-
-    // // Start traversing from the root AST node
-    // traverseAndReplace(ast)
 
     // tree things
     const segments = route.path.split("/")

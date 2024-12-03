@@ -73,9 +73,6 @@ export function Page() {
 }
 ```
 
-> [!TIP]
-> Templates can be either a file or a directory with an `index.ts` file inside.
-
 This generates the `/src/app/blog/page.tsx` file with the following content:
 
 ```ts
