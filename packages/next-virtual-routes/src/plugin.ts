@@ -4,7 +4,7 @@ import { readFile, writeFile, exists, ensureFile, emptydir } from "fs-extra"
 import { createHash } from "crypto"
 import type { Route, RouteContext } from "./lib.js"
 import { debug } from "./util.js"
-import { transform } from "./ast.js"
+import { transform } from "./transform.js"
 
 function printTree(tree: any, prefix: string = ""): void {
   const keys = Object.keys(tree)
@@ -18,18 +18,17 @@ function printTree(tree: any, prefix: string = ""): void {
 
 type RoutesDefinition = Route[] | (() => Route[] | Promise<Route[]>)
 
-type PluginRoutesConfig = {
-  // routes:
-  //   | RoutesDefinition
-  //   | {
-  //       config: RoutesDefinition
-  //       cacheMaxAge?: number
-  //       banner?: string[]
-  //       strict?: boolean
-  //       formatter?: "prettier" | "biome"
-  //     }
-  routes: RoutesDefinition
+type PluginRoutesConfigObject = {
+  config: RoutesDefinition
+  cwd?: string
+  cacheMaxAge?: number
+  banner?: string[]
+  strict?: boolean
+  formatter?: "prettier"
+  formatterConfigFile?: string
 }
+
+type PluginRoutesConfig = RoutesDefinition | PluginRoutesConfigObject
 
 type RouteTree = Record<
   string,
@@ -38,7 +37,8 @@ type RouteTree = Record<
   }
 >
 
-async function isCached(routes: Route[]) {
+// @ts-expect-error TODO: do something with maxAg
+async function isCached(routes: Route[], maxAge: number) {
   const hashPath = join(process.cwd(), ".next/next-virtual-routes/.cache")
 
   debug(`ensuring cache file at ${hashPath}`)
@@ -86,26 +86,83 @@ async function getAppDirectory() {
   throw Error("TODO: no hi ha app dir")
 }
 
-export async function generateRoutes(routes: RoutesDefinition) {
+const configDefaults = {
+  cwd: process.cwd(),
+  cacheMaxAge: Infinity,
+  config: [],
+  strict: false,
+} satisfies PluginRoutesConfigObject
+
+async function resolveConfig(config: PluginRoutesConfig) {
+  if (Array.isArray(config)) {
+    return {
+      ...configDefaults,
+      routes: config,
+    }
+  }
+
+  if (typeof config === "function") {
+    const routes = await config()
+    return {
+      ...configDefaults,
+      routes,
+    }
+  }
+
+  const routes =
+    typeof config.config === "function" ? await config.config() : config.config
+
+  return {
+    ...configDefaults,
+    ...config,
+    routes,
+  }
+}
+
+async function getFormatter(config: PluginRoutesConfigObject) {
+  const formatterConfig = config.formatterConfigFile
+    ? await readFile(config.formatterConfigFile, { encoding: "utf-8" }).then(
+        (file) => JSON.parse(file)
+      )
+    : undefined
+
+  switch (config.formatter) {
+    case "prettier":
+      const prettier = await import("prettier")
+      return function format(source: string) {
+        return prettier.format(source, {
+          parser: "typescript",
+          ...formatterConfig,
+        })
+      }
+    default:
+      return function format(source: string) {
+        return source
+      }
+  }
+}
+
+export async function generateRoutes(config: PluginRoutesConfig) {
   debug("called generateRoutes()")
   debug("resolving routes config")
 
-  const routesConfig = typeof routes === "function" ? await routes() : routes
+  const routesConfig = await resolveConfig(config)
 
-  if (!routesConfig.length) {
+  if (!routesConfig.routes.length) {
     console.warn("TODO: warn routes is empty")
     return
   }
 
-  const cached = await isCached(routesConfig)
+  // const cached = await isCached(routesConfig.routes, routesConfig.cacheMaxAge)
 
-  if (cached) {
-    debug("Reusing cache")
-    return
-  }
+  // if (cached) {
+  //   debug("Reusing cache")
+  //   return
+  // }
 
   const now = new Date().getTime()
   const appDirectory = await getAppDirectory()
+  const format = await getFormatter(routesConfig)
 
   debug("cache MISS. Cleaning virtual directory")
   await emptydir(appDirectory)
@@ -113,7 +170,7 @@ export async function generateRoutes(routes: RoutesDefinition) {
 
   const tree: RouteTree = {}
 
-  const promises = routesConfig.map(async (route) => {
+  const promises = routesConfig.routes.map(async (route) => {
     debug(`processing route ${JSON.stringify(route)}`)
 
     if (route.path.startsWith("/")) {
@@ -137,7 +194,7 @@ export async function generateRoutes(routes: RoutesDefinition) {
 
     const virtualRoutePath = join(appDirectory, route.path)
 
-    const routeContext: RouteContext = {
+    const context: RouteContext = {
       filename: virtualRoutePath,
       context: route.context,
     }
@@ -150,9 +207,9 @@ export async function generateRoutes(routes: RoutesDefinition) {
       return console.warn("TODO: empty tempalte file")
     }
 
-    // TODO: (AST) inject route context after imports to make generated files less ugly
-    const template = transform(templateCode, routeContext)
-    await writeFile(virtualRoutePath, template)
+    const transformed = transform(templateCode, context)
+    const formatted = await format(transformed)
+    await writeFile(virtualRoutePath, formatted)
     debug(`created virtual route at ${virtualRoutePath}`)
 
     // tree things

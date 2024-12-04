@@ -1,4 +1,6 @@
 {
+  "include": ["**/*.ts"],
+  "exclude": ["dist", "node_modules"],
   "compilerOptions": {
     "lib": ["es2022"],
     "module": "preserve",
@@ -13,7 +15,6 @@
     "allowUnusedLabels": false,
     "forceConsistentCasingInFileNames": true,
     "noImplicitOverride": true,
-    "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true

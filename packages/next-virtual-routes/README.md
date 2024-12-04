@@ -30,6 +30,31 @@ export default withRoutes({
 })
 ```
 
+The `routes` property accepts the following values:
+
+- An array of `route()` calls.
+- A function that returns an array of `route()` calls.
+- An async function that returns an array of `route()` calls.
+
+For advanced configuration, you can also pass an object:
+
+```ts
+// next.config.ts
+
+import { withRoutes } from "next-virtual-routes"
+
+export default withRoutes({
+  routes: {
+    formatter: "prettier",
+    strict: true,
+    config: [
+      /* Routes config */
+    ],
+  },
+  /* Next.js config */
+})
+```
+
 A lower level function is also exposed for cases where you need more control.
 
 ```ts
@@ -147,7 +172,7 @@ export function Page() {
 }
 ```
 
-Statically analyzable expressions are evaluated when applying the template.
+Named exports with statically analyzable expressions are evaluated when applying the template.
 The previous template generates the following content:
 
 ```ts
@@ -163,7 +188,7 @@ const route = {
 export const dynamic = "force-static"
 
 export function Page() {
-  return "Static rendering"
+  return route.context.static ? "Static rendering" : "Dynamic rendering"
 }
 
 // src/app/about/page.tsx
@@ -178,9 +203,158 @@ const route = {
 export const dynamic = "force-dynamic"
 
 export function Page() {
-  return "Dynamic rendering"
+  return route.context.static ? "Static rendering" : "Dynamic rendering"
 }
 ```
+
+## Advanced usage
+
+Check the `[examples](/examples/)` directory to learn more about advanced features and use cases.
+
+## API
+
+<!-- TSDOC_START -->
+
+### Functions
+
+- [route](#route)
+- [prefix](#prefix)
+- [context](#context)
+- [generateRoutes](#generateroutes)
+- [withRoutes](#withroutes)
+
+#### route
+
+Programatically generates a route.
+
+| Function | Type |
+| ---------- | ---------- |
+| `route` | `(path: RouteFilePath, template: string, context?: Context or undefined) => Route` |
+
+Examples:
+
+```ts
+export default withRoutes({
+  routes: [route("blog/page.tsx", "src/templates/page.tsx")],
+})
+```
+Use declaration merging to add a type to the `context` object.
+
+```ts
+declare module "next-virtual-routes" {
+  interface Context {
+    static: boolean
+  }
+}
+
+export default withRoutes({
+  routes: [
+    route("home/page.tsx", "src/templates/page.tsx", {
+      static: true,
+    }),
+    route("blog/page.tsx", "src/templates/page.tsx", {
+      static: false,
+    }),
+  ],
+})
+```
+
+
+#### prefix
+
+Adds a path prefix to a set of routes.
+
+| Function | Type |
+| ---------- | ---------- |
+| `prefix` | `(prefix: string, children: Route[]) => Route[]` |
+
+Examples:
+
+```ts
+const routes = [
+  ...prefix("blog", [
+    route("page.tsx", "src/templates/page.tsx"),
+    route("[...slug]/page.tsx", "src/templates/page.tsx"),
+  ])
+]
+```
+
+
+#### context
+
+Adds context to a set of routes. Nested context are [deeply merged](https://www.npmjs.com/package/ts-deepmerge).
+
+| Function | Type |
+| ---------- | ---------- |
+| `context` | `(context: Context, children: Route[]) => Route[]` |
+
+Examples:
+
+declare module "next-virtual-routes" {
+  interface Context {
+    render: "static" | "dynamic"
+  }
+}
+
+```ts
+const routes = [
+  ...context({ render: "static" }, [
+    route("page.tsx", "src/templates/page.tsx"),
+    route("page.tsx", "src/templates/page.tsx"),
+  ])
+]
+```
+
+
+#### generateRoutes
+
+| Function | Type |
+| ---------- | ---------- |
+| `generateRoutes` | `(config: PluginRoutesConfig) => Promise<void>` |
+
+#### withRoutes
+
+| Function | Type |
+| ---------- | ---------- |
+| `withRoutes` | `({ routes, ...nextConfig }: PluginRoutesConfig and NextConfig) => Promise<NextConfig>` |
+
+
+
+### Interfaces
+
+- [Context](#context)
+
+#### Context
+
+
+
+| Property | Type | Description |
+| ---------- | ---------- | ---------- |
+
+
+### Types
+
+- [RouteContext](#routecontext)
+- [Route](#route)
+
+#### RouteContext
+
+TODO: document
+
+| Type | Type |
+| ---------- | ---------- |
+| `RouteContext` | `{ filename: string context?: Context }` |
+
+#### Route
+
+TODO: document
+
+| Type | Type |
+| ---------- | ---------- |
+| `Route` | `{ path: string template: string context?: Context }` |
+
+
+<!-- TSDOC_END -->
 
 ## LICENSE
 

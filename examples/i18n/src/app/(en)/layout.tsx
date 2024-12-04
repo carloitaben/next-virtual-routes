@@ -9,7 +9,7 @@ import type { Metadata } from "next"
 import "@/globals.css"
 
 export const metadata: Metadata = {
-  title: "en",
+  "title": "en"
 }
 
 export default function RootLayout({
@@ -18,9 +18,9 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang={"en"}>
+    <html lang={route.context.language}>
       <body>
-        <h1>Language: {"en"}</h1>
+        <h1>Language: {route.context.language}</h1>
         {children}
       </body>
     </html>

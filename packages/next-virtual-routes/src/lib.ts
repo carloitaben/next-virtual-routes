@@ -1,6 +1,9 @@
 import { join } from "path"
 import { merge } from "ts-deepmerge"
 
+/**
+ * TODO: document
+ */
 export interface Context {}
 
 declare global {
@@ -139,6 +142,6 @@ export function prefix(prefix: string, children: Route[]): Route[] {
 export function context(context: Context, children: Route[]): Route[] {
   return children.map((child) => ({
     ...child,
-    context: child.context ? merge(child.context, context) : context,
+    context: child.context ? merge(context, child.context) : context,
   }))
 }
