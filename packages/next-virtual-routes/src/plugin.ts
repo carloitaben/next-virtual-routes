@@ -28,6 +28,7 @@ type RoutesDefinition = Route[] | (() => Route[] | Promise<Route[]>)
 type PluginConfigObject = {
   config: RoutesDefinition
   cwd?: string
+  cache?: boolean
   cacheFile?: string
   formatter?: "prettier"
   formatterConfigFile?: string
@@ -57,6 +58,7 @@ async function getAppDirectory() {
 
 const configDefaults = {
   cwd: process.cwd(),
+  cache: true,
   cacheFile: ".next/next-virtual-routes/cache",
   config: [],
 } satisfies PluginConfigObject
@@ -129,7 +131,7 @@ export async function generateRoutes(config: PluginConfig["routes"]) {
   const cacheHash = createHash("sha1").update(cacheHashContent).digest("hex")
   const lastCacheHash = await readFile(cacheFilePath, { encoding: "hex" })
 
-  if (cacheHash === lastCacheHash) {
+  if (cacheHash === lastCacheHash && routesConfig.cache) {
     debug("Cache HIT")
     return
   }
