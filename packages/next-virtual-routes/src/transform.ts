@@ -4,13 +4,13 @@ import MagicString from "magic-string"
 import tsPlugin from "acorn-typescript"
 import { walk } from "zimmerframe"
 import type { Node } from "estree"
-import type { RouteContext } from "./lib"
+import type { Context } from "./lib"
 import { evaluate, FailureError } from "./eval"
 import { debug } from "./util"
 
-const GLOBAL_IDENTIFIER = "route"
+export const GLOBAL_IDENTIFIER = "context"
 
-const ACORN_OPTIONS = {
+export const ACORN_OPTIONS = {
   sourceType: "module",
   ecmaVersion: "latest",
   locations: true,
@@ -44,7 +44,7 @@ function serialize(value: unknown): string {
   }
 }
 
-export function transform(code: string, routeContext: RouteContext) {
+export function transform(code: string, routeContext?: Context) {
   const ast = parser.parse(code, ACORN_OPTIONS)
 
   const global = getGlobalIdentifier(ast as Node)
@@ -53,7 +53,7 @@ export function transform(code: string, routeContext: RouteContext) {
     return code
   }
 
-  if (!routeContext.context) {
+  if (!routeContext) {
     throw Error("TODO: warn necesitas pasar contexto animal")
   }
 
@@ -63,9 +63,9 @@ export function transform(code: string, routeContext: RouteContext) {
     ast as Node,
     { evaluate: false },
     {
-      _(node, context) {
+      _(node, { next }) {
         debug("ast: analyzing node", node.type)
-        context.next()
+        next()
       },
       /**
        * The analysis entry point.
@@ -131,13 +131,9 @@ export function transform(code: string, routeContext: RouteContext) {
     return transformedCode
   }
 
-  magicString.prepend(
-    [
-      // TODO: add ignore things here
-      `const route = ${JSON.stringify(routeContext, null, 2)}`,
-      "\n",
-    ].join("\n")
-  )
-
-  return magicString.toString()
+  return magicString
+    .prepend(
+      `const ${GLOBAL_IDENTIFIER} = ${JSON.stringify(routeContext, null, 2)}\n\n`
+    )
+    .toString()
 }

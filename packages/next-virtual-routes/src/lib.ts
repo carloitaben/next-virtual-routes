@@ -7,23 +7,14 @@ import { merge } from "ts-deepmerge"
 export interface Context {}
 
 declare global {
-  const route: {
-    context: Context
-  }
-}
-
-/**
- * TODO: document
- */
-export type RouteContext = {
-  filename: string
-  context?: Context
+  const context: Context
 }
 
 type RouteFileConvention =
   | "apple-icon"
   | "default"
   | "error"
+  | "forbidden"
   | "icon"
   | "instrumentation"
   | "layout"
@@ -37,9 +28,9 @@ type RouteFileConvention =
   | "robots"
   | "route"
   | "sitemap"
-  | "sitemap"
   | "template"
   | "twitter-image"
+  | "unauthorized"
 
 type RouteFileExtensions = "ts" | "tsx" | "js" | "jsx"
 
@@ -121,7 +112,7 @@ export function prefix(prefix: string, children: Route[]): Route[] {
 }
 
 /**
- * Adds context to a set of routes. Nested context are [deeply merged](https://www.npmjs.com/package/ts-deepmerge).
+ * Adds context to a set of routes. Nested context is [deeply merged](https://www.npmjs.com/package/ts-deepmerge).
  *
  * @example
  * declare module "next-virtual-routes" {

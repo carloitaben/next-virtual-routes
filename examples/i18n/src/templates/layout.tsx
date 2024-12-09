@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import "@/globals.css"
 
 export const metadata: Metadata = {
-  title: route.context.language,
+  title: context.language,
 }
 
 export default function RootLayout({
@@ -11,9 +11,9 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang={route.context.language}>
+    <html lang={context.language}>
       <body>
-        <h1>Language: {route.context.language}</h1>
+        <h1>Language: {context.language}</h1>
         {children}
       </body>
     </html>

@@ -1,6 +1,6 @@
 {
   "name": "next-virtual-routes",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "React Router v7 virtual file routes on Next.js.",
   "author": {
     "name": "Carlo Domínguez",

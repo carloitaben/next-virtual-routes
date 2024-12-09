@@ -4,15 +4,15 @@ React Router v7 [virtual file routes](https://www.youtube.com/watch?v=fjTX8hQTlE
 
 ## Features
 
-- Programatically generate any [Next.js App Router file](https://nextjs.org/docs/app/building-your-application/routing#file-conventions).
-- Mix and match with file-based routing for incremental adoption.
+- Programatically generate [Next.js App Router files](https://nextjs.org/docs/app/building-your-application/routing#file-conventions).
+- Mix and match with file-based routing.
 - Reusable file templates.
 - Fully typesafe.
 
 ## Installation
 
 ```sh
-npm install plugin
+npm install next-virtual-routes
 ```
 
 Then, add the following to your `next.config.ts` file:
@@ -103,11 +103,6 @@ This generates the `/src/app/blog/page.tsx` file with the following content:
 ```ts
 // src/app/blog/page.tsx
 
-const route = {
-  filename: "src/app/blog/page.tsx",
-  context: {},
-}
-
 export function Page() {
   return "Hello world"
 }
@@ -159,16 +154,15 @@ export default withRoutes({
 })
 ```
 
-You can then access this data in your templates
-using the `context` property of `route` global object.
+You can then access this data in your templates using the `context` global object.
 
 ```ts
 // src/templates/page.tsx
 
-export const dynamic = route.context.static ? "force-static" : "force-dynamic"
+export const dynamic = context.static ? "force-static" : "force-dynamic"
 
 export function Page() {
-  return route.context.static ? "Static rendering" : "Dynamic rendering"
+  return context.static ? "Static rendering" : "Dynamic rendering"
 }
 ```
 
@@ -178,38 +172,28 @@ The previous template generates the following content:
 ```ts
 // src/app/home/page.tsx
 
-const route = {
-  filename: "src/app/home/page.tsx",
-  context: {
-    static: true,
-  },
+const context = {
+  static: true,
 }
 
 export const dynamic = "force-static"
 
 export function Page() {
-  return route.context.static ? "Static rendering" : "Dynamic rendering"
+  return context.static ? "Static rendering" : "Dynamic rendering"
 }
 
 // src/app/about/page.tsx
 
-const route = {
-  filename: "src/app/about/page.tsx",
-  context: {
-    static: false,
-  },
+const context = {
+  static: false,
 }
 
 export const dynamic = "force-dynamic"
 
 export function Page() {
-  return route.context.static ? "Static rendering" : "Dynamic rendering"
+  return context.static ? "Static rendering" : "Dynamic rendering"
 }
 ```
-
-## Advanced usage
-
-Check the `[examples](/examples/)` directory to learn more about advanced features and use cases.
 
 ## API
 
@@ -282,7 +266,7 @@ const routes = [
 
 #### context
 
-Adds context to a set of routes. Nested context are [deeply merged](https://www.npmjs.com/package/ts-deepmerge).
+Adds context to a set of routes. Nested context is [deeply merged](https://www.npmjs.com/package/ts-deepmerge).
 
 | Function | Type |
 | ---------- | ---------- |
@@ -308,15 +292,19 @@ const routes = [
 
 #### generateRoutes
 
+TODO: document
+
 | Function | Type |
 | ---------- | ---------- |
-| `generateRoutes` | `(config: PluginRoutesConfig) => Promise<void>` |
+| `generateRoutes` | `(config: RoutesDefinition or PluginConfigObject) => Promise<void>` |
 
 #### withRoutes
 
+TODO: document
+
 | Function | Type |
 | ---------- | ---------- |
-| `withRoutes` | `({ routes, ...nextConfig }: PluginRoutesConfig and NextConfig) => Promise<NextConfig>` |
+| `withRoutes` | `({ routes, ...nextConfig }: PluginConfig) => Promise<NextConfig>` |
 
 
 
@@ -326,7 +314,7 @@ const routes = [
 
 #### Context
 
-
+TODO: document
 
 | Property | Type | Description |
 | ---------- | ---------- | ---------- |
@@ -334,16 +322,7 @@ const routes = [
 
 ### Types
 
-- [RouteContext](#routecontext)
 - [Route](#route)
-
-#### RouteContext
-
-TODO: document
-
-| Type | Type |
-| ---------- | ---------- |
-| `RouteContext` | `{ filename: string context?: Context }` |
 
 #### Route
 
