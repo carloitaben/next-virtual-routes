@@ -27,6 +27,8 @@ type RoutesDefinition = Route[] | (() => Route[] | Promise<Route[]>)
 
 type PluginConfigObject = {
   config: RoutesDefinition
+  banner?: string[]
+  footer?: string[]
   cwd?: string
   cache?: boolean
   cacheFile?: string
@@ -59,6 +61,8 @@ async function getAppDirectory() {
 const configDefaults = {
   cwd: process.cwd(),
   cache: true,
+  banner: [],
+  footer: [],
   cacheFile: ".next/next-virtual-routes/cache",
   config: [],
 } satisfies PluginConfigObject
@@ -178,7 +182,12 @@ export async function generateRoutes(config: PluginConfig["routes"]) {
       return console.warn("TODO: empty tempalte file")
     }
 
-    const transformed = transform(templateCode, route.context)
+    const transformed = transform(templateCode, {
+      routeContext: route.context,
+      banner: routesConfig.banner,
+      footer: routesConfig.footer,
+    })
+
     const formatted = await format(transformed)
     await writeFile(virtualRoutePath, formatted)
     debug(`created virtual route at ${virtualRoutePath}`)

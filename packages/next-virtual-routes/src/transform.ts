@@ -44,20 +44,33 @@ function serialize(value: unknown): string {
   }
 }
 
-export function transform(code: string, routeContext?: Context) {
+export function transform(
+  code: string,
+  {
+    routeContext,
+    banner,
+    footer,
+  }: {
+    routeContext?: Context
+    banner: string[]
+    footer: string[]
+  }
+) {
+  const bannerConcat = banner.length ? banner.join("\n") + "\n" : ""
+  const footerConcat = footer.length ? "\n" + footer.join("\n") : ""
+  const magicString = new MagicString(code)
   const ast = parser.parse(code, ACORN_OPTIONS)
-
   const global = getGlobalIdentifier(ast as Node)
 
   if (!global) {
-    return code
+    magicString.prepend(bannerConcat)
+    magicString.append(footerConcat)
+    return magicString.toString()
   }
 
   if (!routeContext) {
     throw Error("TODO: warn necesitas pasar contexto animal")
   }
-
-  const magicString = new MagicString(code)
 
   walk<Node, { evaluate: boolean }>(
     ast as Node,
@@ -119,8 +132,7 @@ export function transform(code: string, routeContext?: Context) {
     }
   )
 
-  const transformedCode = magicString.toString()
-  const transformedCodeAst = parser.parse(transformedCode, {
+  const transformedCodeAst = parser.parse(magicString.toString(), {
     sourceType: "module",
     ecmaVersion: "latest",
     locations: true,
@@ -128,12 +140,16 @@ export function transform(code: string, routeContext?: Context) {
   })
 
   if (!getGlobalIdentifier(transformedCodeAst as Node)) {
-    return transformedCode
+    magicString.prepend(bannerConcat)
+    magicString.append(footerConcat)
+    return magicString.toString()
   }
 
   return magicString
     .prepend(
       `const ${GLOBAL_IDENTIFIER} = ${JSON.stringify(routeContext, null, 2)}\n\n`
     )
+    .prepend(bannerConcat)
+    .append(footerConcat)
     .toString()
 }

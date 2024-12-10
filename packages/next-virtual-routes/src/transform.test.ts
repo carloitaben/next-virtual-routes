@@ -2,21 +2,25 @@ import { describe, expect, it } from "vitest"
 import { GLOBAL_IDENTIFIER, transform } from "./transform"
 
 const context = {
-  string: "string",
-  boolean: true,
-  number: 123,
-  null: null,
-  array: [1, 2, 3],
-  nested: {
-    foo: {
-      bar: [
-        {
-          baz: "qux",
-        },
-      ],
+  banner: [],
+  footer: [],
+  routeContext: {
+    string: "string",
+    boolean: true,
+    number: 123,
+    null: null,
+    array: [1, 2, 3],
+    nested: {
+      foo: {
+        bar: [
+          {
+            baz: "qux",
+          },
+        ],
+      },
     },
   },
-} as const
+} as const satisfies Parameters<typeof transform>[1]
 
 const CONTEXT_INJECTION = `const ${GLOBAL_IDENTIFIER} = {`
 
@@ -63,43 +67,55 @@ describe("Transformations", () => {
 
   it("transforms primitives", () => {
     expect(transform(`export const foo = context.string`, context)).toBe(
-      `export const foo = ${JSON.stringify(context.string)}`
+      `export const foo = ${JSON.stringify(context.routeContext.string)}`
     )
 
     expect(transform(`export const foo = context.boolean`, context)).toBe(
-      `export const foo = ${JSON.stringify(context.boolean)}`
+      `export const foo = ${JSON.stringify(context.routeContext.boolean)}`
     )
 
     expect(transform(`export const foo = context.number`, context)).toBe(
-      `export const foo = ${JSON.stringify(context.number)}`
+      `export const foo = ${JSON.stringify(context.routeContext.number)}`
     )
 
     expect(transform(`export const foo = context.null`, context)).toBe(
-      `export const foo = ${JSON.stringify(context.null)}`
+      `export const foo = ${JSON.stringify(context.routeContext.null)}`
     )
 
     expect(transform(`export const foo = context.array`, context)).toBe(
-      `export const foo = ${JSON.stringify(context.array)}`
+      `export const foo = ${JSON.stringify(context.routeContext.array)}`
     )
 
     expect(transform(`export const foo = context.array[0]`, context)).toBe(
-      `export const foo = ${JSON.stringify(context.array[0])}`
+      `export const foo = ${JSON.stringify(context.routeContext.array[0])}`
     )
 
     expect(transform(`export const foo = context.nested`, context)).toBe(
-      `export const foo = ${JSON.stringify(context.nested, null, 2)}`
+      `export const foo = ${JSON.stringify(context.routeContext.nested, null, 2)}`
     )
 
     expect(
       transform(`export const foo = context.nested.foo.bar[0].baz`, context)
     ).toBe(
-      `export const foo = ${JSON.stringify(context.nested.foo.bar[0].baz)}`
+      `export const foo = ${JSON.stringify(context.routeContext.nested.foo.bar[0].baz)}`
     )
   })
 
   it("transforms statically analyzable expressions", () => {
     expect(transform("export const foo = context.boolean", context)).toBe(
       "export const foo = true"
+    )
+  })
+
+  it("appends banner and footer", () => {
+    const withBannerAndFooter = {
+      ...context,
+      banner: ["foo", "bar"],
+      footer: ["baz", "qux"],
+    }
+
+    expect(transform("hello", withBannerAndFooter)).toBe(
+      ["foo", "bar", "hello", "baz", "qux"].join("\n")
     )
   })
 })
