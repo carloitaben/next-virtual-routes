@@ -14,7 +14,7 @@ export default withRoutes({
         route("layout.tsx", "src/templates/layout.tsx"),
         route("home/page.tsx", "src/templates/page.tsx"),
         route("blog/page.tsx", "src/templates/page.tsx"),
-      ])
+      ]),
     ),
     ...prefix(
       "en",
@@ -22,7 +22,7 @@ export default withRoutes({
         route("layout.tsx", "src/templates/layout.tsx"),
         route("home/page.tsx", "src/templates/page.tsx"),
         route("blog/page.tsx", "src/templates/page.tsx"),
-      ])
+      ]),
     ),
     ...prefix(
       "es",
@@ -30,7 +30,7 @@ export default withRoutes({
         route("layout.tsx", "src/templates/layout.tsx"),
         route("inicio/page.tsx", "src/templates/page.tsx"),
         route("blog/page.tsx", "src/templates/page.tsx"),
-      ])
+      ]),
     ),
   ],
 })

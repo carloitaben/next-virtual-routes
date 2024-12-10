@@ -21,7 +21,7 @@ export default withRoutes({
               bar: "overriden",
             }),
           ]),
-        ])
+        ]),
       ),
       // ...prefix("(duplicated-warning)", [
       //   route("duplicated/page.tsx", "src/templates/print.tsx"),
