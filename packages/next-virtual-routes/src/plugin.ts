@@ -30,6 +30,7 @@ type PluginConfigObject = {
   banner?: string[]
   footer?: string[]
   cwd?: string
+  log?: boolean
   cache?: boolean
   cacheFile?: string
   formatter?: "prettier"
@@ -60,6 +61,7 @@ async function getAppDirectory() {
 
 const configDefaults = {
   cwd: process.cwd(),
+  log: true,
   cache: true,
   banner: [],
   footer: [],
@@ -128,11 +130,10 @@ export async function generateRoutes(config: PluginConfig["routes"]) {
 
   await ensureFile(cacheFilePath)
 
-  const cacheHashContent = JSON.stringify(
-    routesConfig.routes.sort((a, b) => (a.path > b.path ? 1 : -1))
-  )
+  const cacheHash = createHash("sha1")
+    .update(JSON.stringify(routesConfig.routes))
+    .digest("hex")
 
-  const cacheHash = createHash("sha1").update(cacheHashContent).digest("hex")
   const lastCacheHash = await readFile(cacheFilePath, { encoding: "hex" })
 
   if (cacheHash === lastCacheHash && routesConfig.cache) {
@@ -217,13 +218,17 @@ export async function generateRoutes(config: PluginConfig["routes"]) {
 
   const end = new Date().getTime()
 
-  console.log("")
-  // TODO: make this check green like nextjs does
-  console.log(` ✓ Generated ${result.length} virtual routes in ${end - now}ms`)
-  console.log("")
-  console.log("app")
-  printTree(tree)
-  console.log("")
+  if (routesConfig.log) {
+    console.log("")
+    // TODO: make this check green like nextjs does
+    console.log(
+      ` ✓ Generated ${result.length} virtual routes in ${end - now}ms`
+    )
+    console.log("")
+    console.log("app")
+    printTree(tree)
+    console.log("")
+  }
 }
 
 /**
