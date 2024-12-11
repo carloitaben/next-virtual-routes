@@ -154,11 +154,6 @@ export async function generateRoutes(config: PluginConfig["routes"]) {
   const promises = routesConfig.routes.map(async (route) => {
     debug(`processing route ${JSON.stringify(route)}`)
 
-    if (route.path.startsWith("/")) {
-      console.warn("TODO: no pending slashes")
-      route.path.substring(1)
-    }
-
     const templatePath = join(process.cwd(), route.template)
     const templateExists = await exists(templatePath)
 
