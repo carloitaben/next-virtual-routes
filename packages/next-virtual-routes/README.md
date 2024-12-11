@@ -337,4 +337,4 @@ TODO: document
 
 ## LICENSE
 
-MIT
+[MIT](/LICENSE)
