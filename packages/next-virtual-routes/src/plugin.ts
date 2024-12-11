@@ -3,7 +3,7 @@ import { join } from "path"
 import { readFile, writeFile, exists, ensureFile, emptydir } from "fs-extra"
 import { createHash } from "crypto"
 import type { Route } from "./lib.js"
-import { debug } from "./util.js"
+import { debug, hash } from "./util.js"
 import { transform } from "./transform.js"
 
 type RouteTree = Record<
@@ -12,6 +12,31 @@ type RouteTree = Record<
     [K: string]: RouteTree
   }
 >
+
+/**
+ * TODO: document
+ */
+export type RoutesDefinition = Route[] | (() => Route[] | Promise<Route[]>)
+
+/**
+ * TODO: document
+ */
+export type RoutesPluginConfig = {
+  config: RoutesDefinition
+  banner?: string[]
+  footer?: string[]
+  cwd?: string
+  log?: boolean
+  cache?: boolean
+  cacheFile?: string
+  clearAppDir?: boolean
+  formatter?: "prettier"
+  formatterConfigFile?: string
+}
+
+type NextConfigWithRoutesPlugin = NextConfig & {
+  routes: RoutesDefinition | RoutesPluginConfig
+}
 
 function printTree(tree: any, prefix: string = ""): void {
   const keys = Object.keys(tree)
@@ -23,33 +48,15 @@ function printTree(tree: any, prefix: string = ""): void {
   })
 }
 
-type RoutesDefinition = Route[] | (() => Route[] | Promise<Route[]>)
-
-type PluginConfigObject = {
-  config: RoutesDefinition
-  banner?: string[]
-  footer?: string[]
-  cwd?: string
-  log?: boolean
-  cache?: boolean
-  cacheFile?: string
-  formatter?: "prettier"
-  formatterConfigFile?: string
-}
-
-type PluginConfig = NextConfig & {
-  routes: RoutesDefinition | PluginConfigObject
-}
-
-async function getAppDirectory() {
-  const withSrc = join(process.cwd(), "src/app")
+async function getAppDirectory(config: ResolvedConfig) {
+  const withSrc = join(config.cwd, "src/app")
   const withSrcExists = await exists(withSrc)
 
   if (withSrcExists) {
     return withSrc
   }
 
-  const withoutSrc = join(process.cwd(), "app")
+  const withoutSrc = join(config.cwd, "app")
   const withoutSrcExists = await exists(withoutSrc)
 
   if (withoutSrcExists) {
@@ -63,13 +70,14 @@ const configDefaults = {
   cwd: process.cwd(),
   log: true,
   cache: true,
+  clearAppDir: false,
   banner: [],
   footer: [],
   cacheFile: ".next/next-virtual-routes/cache",
   config: [],
-} satisfies PluginConfigObject
+} satisfies RoutesPluginConfig
 
-async function resolveConfig(config: PluginConfig["routes"]) {
+async function resolveConfig(config: NextConfigWithRoutesPlugin["routes"]) {
   if (Array.isArray(config)) {
     return {
       ...configDefaults,
@@ -95,7 +103,9 @@ async function resolveConfig(config: PluginConfig["routes"]) {
   }
 }
 
-async function getFormatter(config: PluginConfigObject) {
+type ResolvedConfig = Awaited<ReturnType<typeof resolveConfig>>
+
+async function getFormatter(config: ResolvedConfig) {
   const formatterConfig = config.formatterConfigFile
     ? await readFile(config.formatterConfigFile, { encoding: "utf-8" }).then(
         (file) => JSON.parse(file)
@@ -121,20 +131,20 @@ async function getFormatter(config: PluginConfigObject) {
 /**
  * TODO: document
  */
-export async function generateRoutes(config: PluginConfig["routes"]) {
+export async function generateRoutes(
+  config: NextConfigWithRoutesPlugin["routes"]
+) {
   debug("called generateRoutes()")
   debug("resolving routes config")
 
   const routesConfig = await resolveConfig(config)
   const cacheFilePath = join(routesConfig.cwd, routesConfig.cacheFile)
 
+  debug(`ensuring cache file at ${cacheFilePath}`)
   await ensureFile(cacheFilePath)
 
-  const cacheHash = createHash("sha1")
-    .update(JSON.stringify(routesConfig.routes))
-    .digest("hex")
-
-  const lastCacheHash = await readFile(cacheFilePath, { encoding: "hex" })
+  const cacheHash = createHash("sha1").update(hash(config)).digest("binary")
+  const lastCacheHash = await readFile(cacheFilePath, { encoding: "binary" })
 
   if (cacheHash === lastCacheHash && routesConfig.cache) {
     debug("Cache HIT")
@@ -142,11 +152,15 @@ export async function generateRoutes(config: PluginConfig["routes"]) {
   }
 
   const now = new Date().getTime()
-  const appDirectory = await getAppDirectory()
+  const appDirectory = await getAppDirectory(routesConfig)
   const format = await getFormatter(routesConfig)
 
-  debug("cache MISS. Cleaning virtual directory")
-  await emptydir(appDirectory)
+  debug("cache MISS")
+
+  if (routesConfig.clearAppDir) {
+    debug(`Clearing app directory at ${appDirectory}`)
+    await emptydir(appDirectory)
+  }
   debug("starting route generation")
 
   const tree: RouteTree = {}
@@ -208,7 +222,7 @@ export async function generateRoutes(config: PluginConfig["routes"]) {
   )
 
   await writeFile(cacheFilePath, cacheHash, {
-    encoding: "hex",
+    encoding: "binary",
   })
 
   const end = new Date().getTime()
@@ -232,7 +246,7 @@ export async function generateRoutes(config: PluginConfig["routes"]) {
 export async function withRoutes({
   routes,
   ...nextConfig
-}: PluginConfig): Promise<NextConfig> {
+}: NextConfigWithRoutesPlugin): Promise<NextConfig> {
   await generateRoutes(routes)
   return nextConfig
 }
