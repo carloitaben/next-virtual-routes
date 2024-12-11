@@ -50,27 +50,26 @@
     }
   },
   "dependencies": {
+    "acorn": "^8.14.0",
+    "acorn-typescript": "^1.4.13",
     "debug": "^4.3.7",
+    "fast-glob": "^3.3.2",
     "fs-extra": "^11.2.0",
-    "ts-deepmerge": "^7.0.1"
+    "magic-string": "^0.30.12",
+    "next": "15.0.3",
+    "periscopic": "^4.0.2",
+    "prettier": "^3.3.3",
+    "ts-deepmerge": "^7.0.1",
+    "zimmerframe": "^1.1.2"
   },
   "devDependencies": {
     "@types/debug": "^4.1.12",
     "@types/estree": "^1.0.6",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^20",
-    "acorn": "^8.14.0",
-    "acorn-typescript": "^1.4.13",
-    "fast-glob": "^3.3.2",
-    "magic-string": "^0.30.12",
-    "next": "15.0.3",
-    "periscopic": "^4.0.2",
-    "prettier": "^3.3.3",
     "tsdoc-markdown": "^0.6.3",
     "tsup": "^8.3.5",
-    "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.5",
-    "zimmerframe": "^1.1.2"
+    "vitest": "^2.1.5"
   }
 }
