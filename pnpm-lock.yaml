@@ -239,15 +239,42 @@ importers:
 
   packages/next-virtual-routes:
     dependencies:
+      acorn:
+        specifier: ^8.14.0
+        version: 8.14.0
+      acorn-typescript:
+        specifier: ^1.4.13
+        version: 1.4.13(acorn@8.14.0)
+      chokidar:
+        specifier: ^4.0.1
+        version: 4.0.1
       debug:
         specifier: ^4.3.7
         version: 4.3.7
+      fast-glob:
+        specifier: ^3.3.2
+        version: 3.3.2
       fs-extra:
         specifier: ^11.2.0
         version: 11.2.0
+      magic-string:
+        specifier: ^0.30.12
+        version: 0.30.12
+      next:
+        specifier: 15.0.3
+        version: 15.0.3(react-dom@19.0.0-rc-66855b96-20241106(react@19.0.0-rc-66855b96-20241106))(react@19.0.0-rc-66855b96-20241106)
+      periscopic:
+        specifier: ^4.0.2
+        version: 4.0.2
+      prettier:
+        specifier: ^3.3.3
+        version: 3.3.3
       ts-deepmerge:
         specifier: ^7.0.1
         version: 7.0.1
+      zimmerframe:
+        specifier: ^1.1.2
+        version: 1.1.2
     devDependencies:
       '@types/debug':
         specifier: ^4.1.12
@@ -261,45 +288,18 @@ importers:
       '@types/node':
         specifier: ^20
         version: 20.17.6
-      acorn:
-        specifier: ^8.14.0
-        version: 8.14.0
-      acorn-typescript:
-        specifier: ^1.4.13
-        version: 1.4.13(acorn@8.14.0)
-      fast-glob:
-        specifier: ^3.3.2
-        version: 3.3.2
-      magic-string:
-        specifier: ^0.30.12
-        version: 0.30.12
-      next:
-        specifier: 15.0.3
-        version: 15.0.3(react-dom@19.0.0-rc-66855b96-20241106(react@19.0.0-rc-66855b96-20241106))(react@19.0.0-rc-66855b96-20241106)
-      periscopic:
-        specifier: ^4.0.2
-        version: 4.0.2
-      prettier:
-        specifier: ^3.3.3
-        version: 3.3.3
       tsdoc-markdown:
         specifier: ^0.6.3
         version: 0.6.3(typescript@5.6.3)
       tsup:
         specifier: ^8.3.5
         version: 8.3.5(postcss@8.4.49)(tsx@4.19.2)(typescript@5.6.3)
-      tsx:
-        specifier: ^4.19.2
-        version: 4.19.2
       typescript:
         specifier: ^5.6.3
         version: 5.6.3
       vitest:
         specifier: ^2.1.5
         version: 2.1.5(@types/node@20.17.6)
-      zimmerframe:
-        specifier: ^1.1.2
-        version: 1.1.2
 
 packages:
 
@@ -4149,6 +4149,7 @@ snapshots:
       '@esbuild/win32-arm64': 0.23.1
       '@esbuild/win32-ia32': 0.23.1
       '@esbuild/win32-x64': 0.23.1
+    optional: true
 
   esbuild@0.24.0:
     optionalDependencies:
@@ -5443,6 +5444,7 @@ snapshots:
       get-tsconfig: 4.8.1
     optionalDependencies:
       fsevents: 2.3.3
+    optional: true
 
   type-check@0.4.0:
     dependencies:

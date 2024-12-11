@@ -1,5 +1,6 @@
 {
   "name": "next-virtual-routes",
+  "type": "commonjs",
   "version": "0.3.0",
   "description": "React Router v7 virtual file routes on Next.js.",
   "author": {
@@ -50,19 +51,20 @@
     }
   },
   "dependencies": {
-    "acorn": "^8.14.0",
-    "acorn-typescript": "^1.4.13",
+    "chokidar": "^4.0.1",
     "debug": "^4.3.7",
     "fast-glob": "^3.3.2",
     "fs-extra": "^11.2.0",
     "magic-string": "^0.30.12",
     "next": "15.0.3",
-    "periscopic": "^4.0.2",
     "prettier": "^3.3.3",
-    "ts-deepmerge": "^7.0.1",
-    "zimmerframe": "^1.1.2"
+    "ts-deepmerge": "^7.0.1"
   },
   "devDependencies": {
+    "acorn": "^8.14.0",
+    "acorn-typescript": "^1.4.13",
+    "periscopic": "^4.0.2",
+    "zimmerframe": "^1.1.2",
     "@types/debug": "^4.1.12",
     "@types/estree": "^1.0.6",
     "@types/fs-extra": "^11.0.4",
