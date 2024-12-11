@@ -1,5 +1,6 @@
 import type { NextConfig } from "next"
 import { join } from "path"
+import { watch } from "chokidar"
 import { readFile, writeFile, exists, ensureFile, emptydir } from "fs-extra"
 import { createHash } from "crypto"
 import type { Route } from "./lib.js"
@@ -28,6 +29,7 @@ export type RoutesPluginConfig = {
   cwd?: string
   log?: boolean
   cache?: boolean
+  watch?: boolean
   cacheFile?: string
   clearAppDir?: boolean
   formatter?: "prettier"
@@ -37,6 +39,18 @@ export type RoutesPluginConfig = {
 type NextConfigWithRoutesPlugin = NextConfig & {
   routes: RoutesDefinition | RoutesPluginConfig
 }
+
+const configDefaults = {
+  cwd: process.cwd(),
+  log: true,
+  cache: true,
+  watch: !process.env.CI,
+  clearAppDir: false,
+  banner: [],
+  footer: [],
+  cacheFile: ".next/next-virtual-routes/cache",
+  config: [],
+} satisfies RoutesPluginConfig
 
 function printTree(tree: any, prefix: string = ""): void {
   const keys = Object.keys(tree)
@@ -65,17 +79,6 @@ async function getAppDirectory(config: ResolvedConfig) {
 
   throw Error("TODO: no hi ha app dir")
 }
-
-const configDefaults = {
-  cwd: process.cwd(),
-  log: true,
-  cache: true,
-  clearAppDir: false,
-  banner: [],
-  footer: [],
-  cacheFile: ".next/next-virtual-routes/cache",
-  config: [],
-} satisfies RoutesPluginConfig
 
 async function resolveConfig(config: NextConfigWithRoutesPlugin["routes"]) {
   if (Array.isArray(config)) {
@@ -128,6 +131,72 @@ async function getFormatter(config: ResolvedConfig) {
   }
 }
 
+async function generateRoute(
+  route: Route,
+  {
+    tree,
+    config,
+    format,
+    appDirectory,
+  }: {
+    tree?: RouteTree
+    appDirectory: string
+    config: ResolvedConfig
+    format: Awaited<ReturnType<typeof getFormatter>>
+  }
+) {
+  debug(`processing route ${JSON.stringify(route)}`)
+
+  const templatePath = join(process.cwd(), route.template)
+  const templateExists = await exists(templatePath)
+
+  if (!templateExists) {
+    throw Error(`TODO: missing template ${templatePath}`)
+  }
+
+  const fsRoutePath = join(process.cwd(), route.path)
+  const fsRouteExist = await exists(fsRoutePath)
+
+  if (fsRouteExist) {
+    return console.warn(`TODO: warn existing fs route "${route.path}"`)
+  }
+
+  const virtualRoutePath = join(appDirectory, route.path)
+
+  debug(`writing virtual route at ${virtualRoutePath}`)
+  await ensureFile(virtualRoutePath)
+  const templateCode = await readFile(templatePath, "utf-8")
+
+  if (!templateCode) {
+    console.warn("TODO: warn empty template file")
+  }
+
+  const transformed = transform(templateCode, {
+    routeContext: route.context,
+    banner: config.banner,
+    footer: config.footer,
+  })
+
+  const formatted = await format(transformed)
+  await writeFile(virtualRoutePath, formatted)
+  debug(`created virtual route at ${virtualRoutePath}`)
+
+  if (tree) {
+    const segments = route.path.split("/")
+    let currentLevel = tree
+
+    segments.forEach((segment) => {
+      if (!currentLevel[segment]) {
+        currentLevel[segment] = {}
+      }
+
+      currentLevel = currentLevel[segment]
+    })
+  }
+
+  return route
+}
+
 /**
  * TODO: document
  */
@@ -147,7 +216,7 @@ export async function generateRoutes(
   const lastCacheHash = await readFile(cacheFilePath, { encoding: "binary" })
 
   if (cacheHash === lastCacheHash && routesConfig.cache) {
-    debug("Cache HIT")
+    debug("cache HIT")
     return
   }
 
@@ -158,76 +227,50 @@ export async function generateRoutes(
   debug("cache MISS")
 
   if (routesConfig.clearAppDir) {
-    debug(`Clearing app directory at ${appDirectory}`)
+    debug(`clearing app directory at ${appDirectory}`)
     await emptydir(appDirectory)
   }
-  debug("starting route generation")
 
   const tree: RouteTree = {}
 
   const promises = routesConfig.routes.map(async (route) => {
-    debug(`processing route ${JSON.stringify(route)}`)
-
-    const templatePath = join(process.cwd(), route.template)
-    const templateExists = await exists(templatePath)
-
-    if (!templateExists) {
-      throw Error(`TODO: missing template ${templatePath}`)
-    }
-
-    const fsRoutePath = join(process.cwd(), route.path)
-    const fsRouteExist = await exists(fsRoutePath)
-
-    if (fsRouteExist) {
-      return console.warn(`TODO: warn existing fs route "${route.path}"`)
-    }
-
-    const virtualRoutePath = join(appDirectory, route.path)
-
-    debug(`writing virtual route at ${virtualRoutePath}`)
-    await ensureFile(virtualRoutePath)
-    const templateCode = await readFile(templatePath, "utf-8")
-
-    if (!templateCode) {
-      return console.warn("TODO: empty tempalte file")
-    }
-
-    const transformed = transform(templateCode, {
-      routeContext: route.context,
-      banner: routesConfig.banner,
-      footer: routesConfig.footer,
+    const generateRouteFunction = generateRoute.bind(null, route, {
+      config: routesConfig,
+      appDirectory,
+      format,
+      tree,
     })
 
-    const formatted = await format(transformed)
-    await writeFile(virtualRoutePath, formatted)
-    debug(`created virtual route at ${virtualRoutePath}`)
+    await generateRouteFunction()
 
-    // tree things
-    const segments = route.path.split("/")
-    let currentLevel = tree
+    if (routesConfig.watch) {
+      debug(`watching template file ${route.template}`)
+      const watcher = watch(route.template, {
+        ignoreInitial: true,
+      })
 
-    segments.forEach((segment) => {
-      if (!currentLevel[segment]) {
-        currentLevel[segment] = {}
-      }
-
-      currentLevel = currentLevel[segment]
-    })
-
-    return route
+      watcher.on("change", async () => {
+        debug(`detected change on template file ${route.template}`)
+        await generateRouteFunction()
+      })
+    }
   })
 
+  debug("starting route generation")
   const result = await Promise.all(promises).then((results) =>
     results.filter((result) => typeof result !== "undefined")
   )
 
+  debug("route generation finished")
+  debug("caching result")
   await writeFile(cacheFilePath, cacheHash, {
     encoding: "binary",
   })
 
-  const end = new Date().getTime()
-
   if (routesConfig.log) {
+    debug("printing result")
+    const end = new Date().getTime()
+
     console.log("")
     // TODO: make this check green like nextjs does
     console.log(
@@ -247,6 +290,7 @@ export async function withRoutes({
   routes,
   ...nextConfig
 }: NextConfigWithRoutesPlugin): Promise<NextConfig> {
+  debug("running Next.js plugin")
   await generateRoutes(routes)
   return nextConfig
 }
