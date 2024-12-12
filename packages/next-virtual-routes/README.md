@@ -300,7 +300,7 @@ TODO: document
 
 | Function | Type |
 | ---------- | ---------- |
-| `generateRoutes` | `(config: RoutesDefinition or PluginConfigObject) => Promise<void>` |
+| `generateRoutes` | `(config: RoutesDefinition or RoutesPluginConfig) => Promise<void>` |
 
 #### withRoutes
 
@@ -308,7 +308,7 @@ TODO: document
 
 | Function | Type |
 | ---------- | ---------- |
-| `withRoutes` | `({ routes, ...nextConfig }: PluginConfig) => Promise<NextConfig>` |
+| `withRoutes` | `({ routes, ...nextConfig }: NextConfigWithRoutesPlugin) => Promise<NextConfig>` |
 
 
 
@@ -327,6 +327,8 @@ TODO: document
 ### Types
 
 - [Route](#route)
+- [RoutesDefinition](#routesdefinition)
+- [RoutesPluginConfig](#routespluginconfig)
 
 #### Route
 
@@ -335,6 +337,22 @@ TODO: document
 | Type | Type |
 | ---------- | ---------- |
 | `Route` | `{ path: string template: string context?: Context }` |
+
+#### RoutesDefinition
+
+TODO: document
+
+| Type | Type |
+| ---------- | ---------- |
+| `RoutesDefinition` | `Route[] or (() => Route[] or Promise<Route[]>)` |
+
+#### RoutesPluginConfig
+
+TODO: document
+
+| Type | Type |
+| ---------- | ---------- |
+| `RoutesPluginConfig` | `{ config: RoutesDefinition banner?: string[] footer?: string[] cwd?: string log?: boolean cache?: boolean watch?: boolean cacheFile?: string clearAppDir?: boolean formatter?: "prettier" formatterConfigFile?: string }` |
 
 
 <!-- TSDOC_END -->
