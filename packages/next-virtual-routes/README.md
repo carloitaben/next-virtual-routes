@@ -1,6 +1,8 @@
 # next-virtual-routes
 
-React Router v7 [virtual file routes](https://www.youtube.com/watch?v=fjTX8hQTlEc&t=730s) on Next.js.
+React Router v7 [virtual* file routes](https://www.youtube.com/watch?v=fjTX8hQTlEc&t=730s) on Next.js.
+
+<sup><sub>*Not really 🤪</sub></sup>
 
 ## Features
 
@@ -194,6 +196,8 @@ export function Page() {
   return context.static ? "Static rendering" : "Dynamic rendering"
 }
 ```
+
+This enables programmatic control of [Route Segment configuration](https://nextjs.org/docs/app/api-reference/file-conventions/route-segment-config), [Middleware matchers](https://nextjs.org/docs/app/building-your-application/routing/middleware#matcher) and more.
 
 ## API
 
