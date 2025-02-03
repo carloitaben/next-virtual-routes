@@ -239,12 +239,6 @@ importers:
 
   packages/next-virtual-routes:
     dependencies:
-      acorn:
-        specifier: ^8.14.0
-        version: 8.14.0
-      acorn-typescript:
-        specifier: ^1.4.13
-        version: 1.4.13(acorn@8.14.0)
       chokidar:
         specifier: ^4.0.1
         version: 4.0.1
@@ -263,18 +257,12 @@ importers:
       next:
         specifier: 15.0.3
         version: 15.0.3(react-dom@19.0.0-rc-66855b96-20241106(react@19.0.0-rc-66855b96-20241106))(react@19.0.0-rc-66855b96-20241106)
-      periscopic:
-        specifier: ^4.0.2
-        version: 4.0.2
       prettier:
         specifier: ^3.3.3
         version: 3.3.3
       ts-deepmerge:
         specifier: ^7.0.1
         version: 7.0.1
-      zimmerframe:
-        specifier: ^1.1.2
-        version: 1.1.2
     devDependencies:
       '@types/debug':
         specifier: ^4.1.12
@@ -288,6 +276,15 @@ importers:
       '@types/node':
         specifier: ^20
         version: 20.17.6
+      acorn:
+        specifier: ^8.14.0
+        version: 8.14.0
+      acorn-typescript:
+        specifier: ^1.4.13
+        version: 1.4.13(acorn@8.14.0)
+      periscopic:
+        specifier: ^4.0.2
+        version: 4.0.2
       tsdoc-markdown:
         specifier: ^0.6.3
         version: 0.6.3(typescript@5.6.3)
@@ -300,6 +297,9 @@ importers:
       vitest:
         specifier: ^2.1.5
         version: 2.1.5(@types/node@20.17.6)
+      zimmerframe:
+        specifier: ^1.1.2
+        version: 1.1.2
 
 packages:
 

@@ -352,7 +352,7 @@ TODO: document
 
 | Type | Type |
 | ---------- | ---------- |
-| `RoutesPluginConfig` | `{ config: RoutesDefinition banner?: string[] footer?: string[] cwd?: string log?: boolean cache?: boolean watch?: boolean cacheFile?: string clearAppDir?: boolean formatter?: "prettier" formatterConfigFile?: string }` |
+| `RoutesPluginConfig` | `{ config: RoutesDefinition banner?: string[] footer?: string[] cwd?: string log?: boolean cache?: boolean watch?: boolean cacheFile?: string formatter?: "prettier" clearFiles?: string[] formatterConfigFile?: string }` |
 
 
 <!-- TSDOC_END -->

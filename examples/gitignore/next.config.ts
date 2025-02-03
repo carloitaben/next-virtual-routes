@@ -20,5 +20,6 @@ export default withRoutes({
       route("blog/[...slug]/page.tsx", "src/templates/page.tsx"),
       route("about/page.tsx", "src/templates/page.tsx"),
     ]),
+    clearFiles: ["(virtual)/**/*"],
   },
 })
