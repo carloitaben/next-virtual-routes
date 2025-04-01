@@ -217,7 +217,10 @@ export async function generateRoutes(
   debug(`ensuring cache file at ${cacheFilePath}`)
   await ensureFile(cacheFilePath)
 
-  const cacheHash = createHash("sha1").update(hash(config)).digest("binary")
+  const cacheHash = createHash("sha1")
+    .update(hash(routesConfig))
+    .digest("binary")
+
   const lastCacheHash = await readFile(cacheFilePath, { encoding: "binary" })
 
   if (cacheHash === lastCacheHash && routesConfig.cache) {

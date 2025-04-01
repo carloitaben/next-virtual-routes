@@ -1,5 +1,5 @@
 const context = {
-  "serialized": "[{\"date\":1},[\"Date\",\"2024-12-10T21:11:43.724Z\"]]"
+  "serialized": "[{\"date\":1},[\"Date\",\"1970-01-01T00:00:00.000Z\"]]"
 }
 
 import { parse } from "devalue"
