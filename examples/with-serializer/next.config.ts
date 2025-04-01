@@ -13,7 +13,7 @@ declare module "next-virtual-routes" {
 export default withRoutes({
   routes: () => {
     const context = stringify({
-      date: new Date(),
+      date: new Date(0),
     } satisfies Context["deserialized"])
 
     return [
