@@ -1,25 +1,40 @@
-import { Context, route, withRoutes } from "next-virtual-routes"
-import { stringify } from "devalue"
+import { routeContext } from "@/lib/routes"
+import { NextConfig } from "next"
+import {
+  Context,
+  RouteFilePath,
+  RouteTemplatePath,
+  route,
+  withRoutes,
+} from "next-virtual-routes"
 
 declare module "next-virtual-routes" {
   interface Context {
-    serialized: string
-    deserialized?: {
-      date: Date
-    }
+    path: RouteFilePath
   }
 }
 
-export default withRoutes({
-  routes: () => {
-    const context = stringify({
-      date: new Date(0),
-    } satisfies Context["deserialized"])
+const nextConfig: NextConfig = {
+  /* config options here */
+}
 
-    return [
-      route("page.tsx", "src/templates/page.tsx", {
-        serialized: context,
-      }),
-    ]
-  },
+function routeWithPath(
+  path: RouteFilePath,
+  template: RouteTemplatePath,
+  context?: Context,
+) {
+  routeContext.set(path, {
+    date: new Date(),
+  })
+
+  return route(path, template, { ...context, path })
+}
+
+export default withRoutes(nextConfig, {
+  routes: [
+    routeWithPath("src/app/page.tsx", "src/templates/page.tsx"),
+    routeWithPath("src/app/shop/page.tsx", "src/templates/page.tsx"),
+    routeWithPath("src/app/blog/page.tsx", "src/templates/page.tsx"),
+  ],
+  remove: ["src/app/**"],
 })

@@ -1,11 +1,18 @@
+import { NextConfig } from "next"
 import { route, withRoutes } from "next-virtual-routes"
 
-export default withRoutes({
+const nextConfig: NextConfig = {
+  /* config options here */
+}
+
+export default withRoutes(nextConfig, {
+  formatter: "prettier",
   routes: [
-    route("page.tsx", "src/templates/page.tsx"),
-    route("shop/page.tsx", "src/templates/page.tsx"),
-    route("blog/page.tsx", "src/templates/page.tsx"),
-    route("blog/[...slug]/page.tsx", "src/templates/page.tsx"),
-    route("about/page.tsx", "src/templates/page.tsx"),
+    route("src/app/page.tsx", "src/templates/page.tsx"),
+    route("src/app/shop/page.tsx", "src/templates/page.tsx"),
+    route("src/app/blog/page.tsx", "src/templates/page.tsx"),
+    route("src/app/blog/[...slug]/page.tsx", "src/templates/page.tsx"),
+    route("src/app/about/page.tsx", "src/templates/page.tsx"),
   ],
+  remove: ["src/app/**"],
 })

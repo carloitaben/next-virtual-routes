@@ -1,15 +1,12 @@
-import { parse } from "devalue"
-import { Context } from "next-virtual-routes"
+import { getRouteContext } from "@/lib/routes"
 
-const deserialized = parse(
-  context.serialized,
-) as Required<Context>["deserialized"]
+const routeContext = getRouteContext(context.path)
 
 export default function Page() {
   return (
     <html>
       <body>
-        {deserialized.date instanceof Date ? "It's a date!" : "Not a date"}
+        {routeContext.date instanceof Date ? "It's a date!" : "Not a date"}
       </body>
     </html>
   )

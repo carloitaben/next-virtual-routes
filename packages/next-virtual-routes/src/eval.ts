@@ -1,15 +1,84 @@
-import type { Node } from "estree"
+import { Effect } from "effect"
+import ts from "typescript"
 
-type Vars = Record<PropertyKey, unknown>
+// si hay directiva, encontrarla
+// si hay imports, encontrar el último
+// y entonces poner el contexto
+//
 
-export class FailureError extends Error {
-  constructor(node: Node) {
-    super()
-    this.name = "FailureError"
-    this.message = `Unsupported node type: "${node.type}"`
-    this.cause = node
-  }
+function hasExportModifier(node: {
+  modifiers?: ts.NodeArray<ts.ModifierLike>
+}) {
+  return node.modifiers?.some(
+    (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+  )
 }
+
+export const parse = Effect.fn(
+  ({ code }: { code: string; from: string; to: string }) =>
+    Effect.gen(function* () {
+      const sourceFile = ts.createSourceFile(
+        "foo.ts",
+        code,
+        ts.ScriptTarget.Latest,
+        true,
+      )
+
+      const directives: ts.StringLiteral[] = []
+      const importDeclarations: ts.ImportDeclaration[] = []
+      const exportDeclarations = []
+
+      function evaluate(node: ts.Node) {
+        console.log("evaluating node")
+        console.log(node.getFullText())
+        console.log("---")
+
+        // Directives
+        if (
+          ts.isExpressionStatement(node) &&
+          ts.isStringLiteral(node.expression)
+        ) {
+          directives.push(node.expression)
+          return
+        }
+
+        // Imports
+        if (ts.isImportDeclaration(node)) {
+          importDeclarations.push(node)
+          return
+        }
+
+        // `export const`
+        if (ts.isVariableStatement(node) && hasExportModifier(node)) {
+          exportDeclarations.push(node)
+        }
+
+        // `export function`
+        if (ts.isFunctionDeclaration(node) && hasExportModifier(node)) {
+          exportDeclarations.push(node)
+        }
+      }
+
+      sourceFile.statements.forEach((statement) => {
+        evaluate(statement)
+      })
+
+      const contextPlace = importDeclarations?.at(-1) || directives?.at(-1)
+    }),
+)
+
+// import type { Node } from "estree"
+
+// type Vars = Record<PropertyKey, unknown>
+
+// export class FailureError extends Error {
+//   constructor(node: Node) {
+//     super()
+//     this.name = "FailureError"
+//     this.message = `Unsupported node type: "${node.type}"`
+//     this.cause = node
+//   }
+// }
 
 export function evaluate(node: Node, vars: Vars = {}): any {
   switch (node.type) {
@@ -22,7 +91,7 @@ export function evaluate(node: Node, vars: Vars = {}): any {
         : node.declaration
     case "VariableDeclaration":
       const result = node.declarations.map((declaration) =>
-        evaluate(declaration, vars)
+        evaluate(declaration, vars),
       )
 
       return result.length > 1 ? result : result[0]

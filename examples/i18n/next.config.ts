@@ -1,3 +1,4 @@
+import { NextConfig } from "next"
 import { context, prefix, route, withRoutes } from "next-virtual-routes"
 
 declare module "next-virtual-routes" {
@@ -6,31 +7,39 @@ declare module "next-virtual-routes" {
   }
 }
 
-export default withRoutes({
+const nextConfig: NextConfig = {
+  /* config options here */
+}
+
+export default withRoutes(nextConfig, {
   routes: [
     ...prefix(
-      "(en)",
-      context({ language: "en" }, [
+      "src/app/(en)/",
+      ...context(
+        { language: "en" },
         route("layout.tsx", "src/templates/layout.tsx"),
         route("home/page.tsx", "src/templates/page.tsx"),
         route("blog/page.tsx", "src/templates/page.tsx"),
-      ]),
+      ),
     ),
     ...prefix(
-      "en",
-      context({ language: "en" }, [
+      "src/app/en",
+      ...context(
+        { language: "en" },
         route("layout.tsx", "src/templates/layout.tsx"),
         route("home/page.tsx", "src/templates/page.tsx"),
         route("blog/page.tsx", "src/templates/page.tsx"),
-      ]),
+      ),
     ),
     ...prefix(
-      "es",
-      context({ language: "es" }, [
+      "src/app/es",
+      ...context(
+        { language: "es" },
         route("layout.tsx", "src/templates/layout.tsx"),
         route("inicio/page.tsx", "src/templates/page.tsx"),
         route("blog/page.tsx", "src/templates/page.tsx"),
-      ]),
+      ),
     ),
   ],
+  remove: ["src/app/**"],
 })

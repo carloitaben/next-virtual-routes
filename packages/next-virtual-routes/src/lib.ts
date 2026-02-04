@@ -1,138 +1,149 @@
-import { join } from "path"
-import { merge } from "ts-deepmerge"
+import { Data, Effect } from "effect"
 
-/**
- * TODO: document
- */
-export interface Context {}
+export class DynamicImportError extends Data.TaggedError("DynamicImportError")<{
+  cause: unknown
+  specifier: string
+}> {}
 
-declare global {
-  const context: Context
-}
+export const dynamicImport = <A>(
+  specifier: string,
+  dynamicImport: () => Promise<A>,
+) =>
+  Effect.tryPromise({
+    try: dynamicImport,
+    catch: (cause) =>
+      new DynamicImportError({
+        cause,
+        specifier,
+      }),
+  })
 
-type RouteFileConvention =
-  | "apple-icon"
-  | "default"
-  | "error"
-  | "forbidden"
-  | "icon"
-  | "instrumentation"
-  | "layout"
-  | "loading"
-  | "manifest"
-  | "mdx-components"
-  | "middleware"
-  | "not-found"
-  | "opengraph-image"
-  | "page"
-  | "robots"
-  | "route"
-  | "sitemap"
-  | "template"
-  | "twitter-image"
-  | "unauthorized"
+// import { join } from "path"
+// import { merge } from "ts-deepmerge"
 
-type RouteFileExtensions = "ts" | "tsx" | "js" | "jsx"
+// type RouteFileConvention =
+//   | "apple-icon"
+//   | "default"
+//   | "error"
+//   | "forbidden"
+//   | "icon"
+//   | "instrumentation"
+//   | "layout"
+//   | "loading"
+//   | "manifest"
+//   | "mdx-components"
+//   | "middleware"
+//   | "not-found"
+//   | "opengraph-image"
+//   | "page"
+//   | "robots"
+//   | "route"
+//   | "sitemap"
+//   | "template"
+//   | "twitter-image"
+//   | "unauthorized"
 
-type RouteFilePath =
-  | `${RouteFileConvention}.${RouteFileExtensions}`
-  | `${string}/${RouteFileConvention}.${RouteFileExtensions}`
+// type RouteFileExtensions = "ts" | "tsx" | "js" | "jsx"
 
-/**
- * TODO: document
- */
-export type Route = {
-  path: string
-  template: string
-  context?: Context
-}
+// type RouteFilePath =
+//   | `${RouteFileConvention}.${RouteFileExtensions}`
+//   | `${string}/${RouteFileConvention}.${RouteFileExtensions}`
 
-/**
- * Programatically generates a route.
- *
- * @example
- * ```ts
- * export default withRoutes({
- *   routes: [route("blog/page.tsx", "src/templates/page.tsx")],
- * })
- * ```
- *
- * @example
- * Use declaration merging to add a type to the `context` object.
- *
- * ```ts
- * declare module "next-virtual-routes" {
- *   interface Context {
- *     static: boolean
- *   }
- * }
- *
- * export default withRoutes({
- *   routes: [
- *     route("home/page.tsx", "src/templates/page.tsx", {
- *       static: true,
- *     }),
- *     route("blog/page.tsx", "src/templates/page.tsx", {
- *       static: false,
- *     }),
- *   ],
- * })
- * ```
- */
-export function route(
-  path: RouteFilePath,
-  template: string,
-  context?: Context
-): Route {
-  return {
-    path,
-    template,
-    context,
-  }
-}
+// /**
+//  * TODO: document
+//  */
+// export type Route = {
+//   path: string
+//   template: string
+//   context?: Context
+// }
 
-/**
- * Adds a path prefix to a set of routes.
- *
- * @example
- * ```ts
- * const routes = [
- *   ...prefix("blog", [
- *     route("page.tsx", "src/templates/page.tsx"),
- *     route("[...slug]/page.tsx", "src/templates/page.tsx"),
- *   ])
- * ]
- * ```
- */
-export function prefix(prefix: string, children: Route[]): Route[] {
-  return children.map((child) => ({
-    ...child,
-    path: join(prefix, child.path),
-  }))
-}
+// /**
+//  * Programatically generates a route.
+//  *
+//  * @example
+//  * ```ts
+//  * export default withRoutes({
+//  *   routes: [route("blog/page.tsx", "src/templates/page.tsx")],
+//  * })
+//  * ```
+//  *
+//  * @example
+//  * Use declaration merging to add a type to the `context` object.
+//  *
+//  * ```ts
+//  * declare module "next-virtual-routes" {
+//  *   interface Context {
+//  *     static: boolean
+//  *   }
+//  * }
+//  *
+//  * export default withRoutes({
+//  *   routes: [
+//  *     route("home/page.tsx", "src/templates/page.tsx", {
+//  *       static: true,
+//  *     }),
+//  *     route("blog/page.tsx", "src/templates/page.tsx", {
+//  *       static: false,
+//  *     }),
+//  *   ],
+//  * })
+//  * ```
+//  */
+// export function route(
+//   path: RouteFilePath,
+//   template: string,
+//   context?: Context,
+// ): Route {
+//   return {
+//     path,
+//     template,
+//     context,
+//   }
+// }
 
-/**
- * Adds context to a set of routes. Nested context is [deeply merged](https://www.npmjs.com/package/ts-deepmerge).
- *
- * @example
- * declare module "next-virtual-routes" {
- *   interface Context {
- *     render: "static" | "dynamic"
- *   }
- * }
- *
- * ```ts
- * const routes = [
- *   ...context({ render: "static" }, [
- *     route("page.tsx", "src/templates/page.tsx"),
- *     route("page.tsx", "src/templates/page.tsx"),
- *   ])
- * ]
- * ```
- */
-export function context(context: Context, children: Route[]): Route[] {
-  return children.map((child) => ({
-    ...child,
-    context: child.context ? merge(context, child.context) : context,
-  }))
-}
+// /**
+//  * Adds a path prefix to a set of routes.
+//  *
+//  * @example
+//  * ```ts
+//  * const routes = [
+//  *   ...prefix("blog", [
+//  *     route("page.tsx", "src/templates/page.tsx"),
+//  *     route("[...slug]/page.tsx", "src/templates/page.tsx"),
+//  *   ])
+//  * ]
+//  * ```
+//  */
+// export function prefix(prefix: string, children: Route[]): Route[] {
+//   return children.map((child) => ({
+//     ...child,
+//     path: join(prefix, child.path),
+//   }))
+// }
+
+// /**
+//  * Adds context to a set of routes. Nested context is [deeply merged](https://www.npmjs.com/package/ts-deepmerge).
+//  *
+//  * @example
+//  * declare module "next-virtual-routes" {
+//  *   interface Context {
+//  *     render: "static" | "dynamic"
+//  *   }
+//  * }
+//  *
+//  * ```ts
+//  * const routes = [
+//  *   ...context({ render: "static" }, [
+//  *     route("page.tsx", "src/templates/page.tsx"),
+//  *     route("page.tsx", "src/templates/page.tsx"),
+//  *   ])
+//  * ]
+//  * ```
+//  */
+// export function context(context: Context, children: Route[]): Route[] {
+//   return children.map((child) => ({
+//     ...child,
+//     context: child.context ? merge(context, child.context) : context,
+//   }))
+// }
