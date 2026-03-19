@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   /* config options here */
 }
 
-export default withRoutes(nextConfig, {
+export default withRoutes({
   routes: prefix(
     "src/app/(generated)/",
     route("page.tsx", "src/templates/page.tsx"),
@@ -14,5 +14,5 @@ export default withRoutes(nextConfig, {
     route("blog/[...slug]/page.tsx", "src/templates/page.tsx"),
     route("about/page.tsx", "src/templates/page.tsx"),
   ),
-  remove: ["(generated)/**"],
-})
+  remove: ["src/app/(generated)/**"],
+})(nextConfig)

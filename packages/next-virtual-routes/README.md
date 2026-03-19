@@ -213,102 +213,33 @@ This enables programmatic control of [Route Segment configuration](https://nextj
 
 #### route
 
-Programatically generates a route.
-
 | Function | Type |
 | ---------- | ---------- |
-| `route` | `(path: RouteFilePath, template: string, context?: Context or undefined) => Route` |
-
-Examples:
-
-```ts
-export default withRoutes({
-  routes: [route("blog/page.tsx", "src/templates/page.tsx")],
-})
-```
-Use declaration merging to add a type to the `context` object.
-
-```ts
-declare module "next-virtual-routes" {
-  interface Context {
-    static: boolean
-  }
-}
-
-export default withRoutes({
-  routes: [
-    route("home/page.tsx", "src/templates/page.tsx", {
-      static: true,
-    }),
-    route("blog/page.tsx", "src/templates/page.tsx", {
-      static: false,
-    }),
-  ],
-})
-```
-
+| `route` | `(path: string, template: string, context?: Context or undefined) => Readonly<{ path: string; template: string; context?: Context or undefined; }>` |
 
 #### prefix
 
-Adds a path prefix to a set of routes.
-
 | Function | Type |
 | ---------- | ---------- |
-| `prefix` | `(prefix: string, children: Route[]) => Route[]` |
-
-Examples:
-
-```ts
-const routes = [
-  ...prefix("blog", [
-    route("page.tsx", "src/templates/page.tsx"),
-    route("[...slug]/page.tsx", "src/templates/page.tsx"),
-  ])
-]
-```
-
+| `prefix` | `(pathPrefix: string, ...children: readonly RouteGroup[]) => Readonly<{ path: string; template: string; context?: Context or undefined; }>[]` |
 
 #### context
 
-Adds context to a set of routes. Nested context is [deeply merged](https://www.npmjs.com/package/ts-deepmerge).
-
 | Function | Type |
 | ---------- | ---------- |
-| `context` | `(context: Context, children: Route[]) => Route[]` |
-
-Examples:
-
-declare module "next-virtual-routes" {
-  interface Context {
-    render: "static" | "dynamic"
-  }
-}
-
-```ts
-const routes = [
-  ...context({ render: "static" }, [
-    route("page.tsx", "src/templates/page.tsx"),
-    route("page.tsx", "src/templates/page.tsx"),
-  ])
-]
-```
-
+| `context` | `(value: Context, ...children: readonly RouteGroup[]) => Readonly<{ path: string; template: string; context?: Context or undefined; }>[]` |
 
 #### generateRoutes
 
-TODO: document
-
 | Function | Type |
 | ---------- | ---------- |
-| `generateRoutes` | `(config: RoutesDefinition or RoutesPluginConfig) => Promise<void>` |
+| `generateRoutes` | `(input: Readonly<{ routes: RoutesDefinition; banner?: string or undefined; footer?: string or undefined; cwd?: string or undefined; lockFile?: string or undefined; remove?: readonly string[] or undefined; watch?: boolean or undefined; }>) => Promise<...>` |
 
 #### withRoutes
 
-TODO: document
-
 | Function | Type |
 | ---------- | ---------- |
-| `withRoutes` | `({ routes, ...nextConfig }: NextConfigWithRoutesPlugin) => Promise<NextConfig>` |
+| `withRoutes` | `(routes: Readonly<{ routes: RoutesDefinition; banner?: string or undefined; footer?: string or undefined; cwd?: string or undefined; lockFile?: string or undefined; remove?: readonly string[] or undefined; watch?: boolean or undefined; }>) => (nextConfig?: NextConfigInput) => (...args: readonly unknown[]) => Promise<...>` |
 
 
 
@@ -318,7 +249,7 @@ TODO: document
 
 #### Context
 
-TODO: document
+
 
 | Property | Type | Description |
 | ---------- | ---------- | ---------- |
@@ -326,33 +257,27 @@ TODO: document
 
 ### Types
 
+- [RouteFilePath](#routefilepath)
+- [RouteTemplatePath](#routetemplatepath)
 - [Route](#route)
-- [RoutesDefinition](#routesdefinition)
-- [RoutesPluginConfig](#routespluginconfig)
+
+#### RouteFilePath
+
+| Type | Type |
+| ---------- | ---------- |
+| `RouteFilePath` |  |
+
+#### RouteTemplatePath
+
+| Type | Type |
+| ---------- | ---------- |
+| `RouteTemplatePath` |  |
 
 #### Route
 
-TODO: document
-
 | Type | Type |
 | ---------- | ---------- |
-| `Route` | `{ path: string template: string context?: Context }` |
-
-#### RoutesDefinition
-
-TODO: document
-
-| Type | Type |
-| ---------- | ---------- |
-| `RoutesDefinition` | `Route[] or (() => Route[] or Promise<Route[]>)` |
-
-#### RoutesPluginConfig
-
-TODO: document
-
-| Type | Type |
-| ---------- | ---------- |
-| `RoutesPluginConfig` | `{ config: RoutesDefinition banner?: string[] footer?: string[] cwd?: string log?: boolean cache?: boolean watch?: boolean cacheFile?: string formatter?: "prettier" clearFiles?: string[] formatterConfigFile?: string }` |
+| `Route` | `Readonly<{ path: string template: string context?: Context }>` |
 
 
 <!-- TSDOC_END -->

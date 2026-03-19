@@ -57,22 +57,26 @@
     }
   },
   "dependencies": {
-    "@effect/platform": "^0.90.6",
-    "@effect/platform-bun": "^0.79.0",
-    "@effect/platform-node": "^0.96.0",
+    "acorn": "^8.15.0",
+    "acorn-typescript": "^1.4.13",
+    "@effect/platform-bun": "4.0.0-beta.35",
+    "@effect/platform-node": "4.0.0-beta.35",
     "chokidar": "^4.0.1",
     "debug": "^4.3.7",
-    "effect": "^3.17.9",
+    "effect": "4.0.0-beta.35",
     "fast-glob": "^3.3.2",
     "fs-extra": "^11.2.0",
     "magic-string": "^0.30.12",
     "next": "15.0.3",
+    "periscopic": "^4.0.2",
     "prettier": "^3.3.3",
     "ts-deepmerge": "^7.0.1",
-    "valibot": "^1.1.0"
+    "valibot": "^1.1.0",
+    "zimmerframe": "^1.1.2"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.2",
+    "@types/estree": "^1.0.8",
     "@effect/vitest": "^0.25.1",
     "@swc/core": "^1.13.5",
     "@types/debug": "^4.1.12",

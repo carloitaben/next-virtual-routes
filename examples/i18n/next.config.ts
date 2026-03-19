@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
   /* config options here */
 }
 
-export default withRoutes(nextConfig, {
+export default withRoutes({
   routes: [
     ...prefix(
       "src/app/(en)/",
@@ -42,4 +42,4 @@ export default withRoutes(nextConfig, {
     ),
   ],
   remove: ["src/app/**"],
-})
+})(nextConfig)

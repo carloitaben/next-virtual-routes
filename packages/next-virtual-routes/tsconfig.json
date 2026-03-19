@@ -1,6 +1,6 @@
 {
-  "include": ["**/*.ts"],
-  "exclude": ["dist", "node_modules"],
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules", "old", "wip"],
   "compilerOptions": {
     "lib": ["es2022"],
     "module": "preserve",

@@ -30,11 +30,11 @@ function routeWithPath(
   return route(path, template, { ...context, path })
 }
 
-export default withRoutes(nextConfig, {
+export default withRoutes({
   routes: [
     routeWithPath("src/app/page.tsx", "src/templates/page.tsx"),
     routeWithPath("src/app/shop/page.tsx", "src/templates/page.tsx"),
     routeWithPath("src/app/blog/page.tsx", "src/templates/page.tsx"),
   ],
   remove: ["src/app/**"],
-})
+})(nextConfig)

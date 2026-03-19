@@ -5,8 +5,7 @@ const nextConfig: NextConfig = {
   /* config options here */
 }
 
-export default withRoutes(nextConfig, {
-  formatter: "prettier",
+export default withRoutes({
   routes: [
     route("src/app/page.tsx", "src/templates/page.tsx"),
     route("src/app/shop/page.tsx", "src/templates/page.tsx"),
@@ -15,4 +14,4 @@ export default withRoutes(nextConfig, {
     route("src/app/about/page.tsx", "src/templates/page.tsx"),
   ],
   remove: ["src/app/**"],
-})
+})(nextConfig)

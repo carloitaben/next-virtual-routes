@@ -1,149 +1,62 @@
-import { Data, Effect } from "effect"
+import { merge } from "ts-deepmerge"
 
-export class DynamicImportError extends Data.TaggedError("DynamicImportError")<{
-  cause: unknown
-  specifier: string
-}> {}
+export interface Context extends Record<PropertyKey, unknown> {}
 
-export const dynamicImport = <A>(
-  specifier: string,
-  dynamicImport: () => Promise<A>,
-) =>
-  Effect.tryPromise({
-    try: dynamicImport,
-    catch: (cause) =>
-      new DynamicImportError({
-        cause,
-        specifier,
-      }),
-  })
+declare global {
+  const context: Context
+}
 
-// import { join } from "path"
-// import { merge } from "ts-deepmerge"
+export type RouteFilePath = string
+export type RouteTemplatePath = string
 
-// type RouteFileConvention =
-//   | "apple-icon"
-//   | "default"
-//   | "error"
-//   | "forbidden"
-//   | "icon"
-//   | "instrumentation"
-//   | "layout"
-//   | "loading"
-//   | "manifest"
-//   | "mdx-components"
-//   | "middleware"
-//   | "not-found"
-//   | "opengraph-image"
-//   | "page"
-//   | "robots"
-//   | "route"
-//   | "sitemap"
-//   | "template"
-//   | "twitter-image"
-//   | "unauthorized"
+export type Route = Readonly<{
+  path: string
+  template: string
+  context?: Context
+}>
 
-// type RouteFileExtensions = "ts" | "tsx" | "js" | "jsx"
+type RouteGroup = Route | ReadonlyArray<Route>
 
-// type RouteFilePath =
-//   | `${RouteFileConvention}.${RouteFileExtensions}`
-//   | `${string}/${RouteFileConvention}.${RouteFileExtensions}`
+function flattenRoutes(children: ReadonlyArray<RouteGroup>): Array<Route> {
+  return children.flatMap((child) => (Array.isArray(child) ? child : [child]))
+}
 
-// /**
-//  * TODO: document
-//  */
-// export type Route = {
-//   path: string
-//   template: string
-//   context?: Context
-// }
+function joinRoutePath(prefix: string, path: string): string {
+  const normalizedPrefix = prefix.replace(/\/+$/, "")
+  const normalizedPath = path.replace(/^\/+/, "")
+  return normalizedPrefix.length === 0
+    ? normalizedPath
+    : `${normalizedPrefix}/${normalizedPath}`
+}
 
-// /**
-//  * Programatically generates a route.
-//  *
-//  * @example
-//  * ```ts
-//  * export default withRoutes({
-//  *   routes: [route("blog/page.tsx", "src/templates/page.tsx")],
-//  * })
-//  * ```
-//  *
-//  * @example
-//  * Use declaration merging to add a type to the `context` object.
-//  *
-//  * ```ts
-//  * declare module "next-virtual-routes" {
-//  *   interface Context {
-//  *     static: boolean
-//  *   }
-//  * }
-//  *
-//  * export default withRoutes({
-//  *   routes: [
-//  *     route("home/page.tsx", "src/templates/page.tsx", {
-//  *       static: true,
-//  *     }),
-//  *     route("blog/page.tsx", "src/templates/page.tsx", {
-//  *       static: false,
-//  *     }),
-//  *   ],
-//  * })
-//  * ```
-//  */
-// export function route(
-//   path: RouteFilePath,
-//   template: string,
-//   context?: Context,
-// ): Route {
-//   return {
-//     path,
-//     template,
-//     context,
-//   }
-// }
+export function route(
+  path: string,
+  template: string,
+  context?: Context,
+): Route {
+  return {
+    context,
+    path,
+    template,
+  }
+}
 
-// /**
-//  * Adds a path prefix to a set of routes.
-//  *
-//  * @example
-//  * ```ts
-//  * const routes = [
-//  *   ...prefix("blog", [
-//  *     route("page.tsx", "src/templates/page.tsx"),
-//  *     route("[...slug]/page.tsx", "src/templates/page.tsx"),
-//  *   ])
-//  * ]
-//  * ```
-//  */
-// export function prefix(prefix: string, children: Route[]): Route[] {
-//   return children.map((child) => ({
-//     ...child,
-//     path: join(prefix, child.path),
-//   }))
-// }
+export function prefix(
+  pathPrefix: string,
+  ...children: ReadonlyArray<RouteGroup>
+): Array<Route> {
+  return flattenRoutes(children).map((child) => ({
+    ...child,
+    path: joinRoutePath(pathPrefix, child.path),
+  }))
+}
 
-// /**
-//  * Adds context to a set of routes. Nested context is [deeply merged](https://www.npmjs.com/package/ts-deepmerge).
-//  *
-//  * @example
-//  * declare module "next-virtual-routes" {
-//  *   interface Context {
-//  *     render: "static" | "dynamic"
-//  *   }
-//  * }
-//  *
-//  * ```ts
-//  * const routes = [
-//  *   ...context({ render: "static" }, [
-//  *     route("page.tsx", "src/templates/page.tsx"),
-//  *     route("page.tsx", "src/templates/page.tsx"),
-//  *   ])
-//  * ]
-//  * ```
-//  */
-// export function context(context: Context, children: Route[]): Route[] {
-//   return children.map((child) => ({
-//     ...child,
-//     context: child.context ? merge(context, child.context) : context,
-//   }))
-// }
+export function context(
+  value: Context,
+  ...children: ReadonlyArray<RouteGroup>
+): Array<Route> {
+  return flattenRoutes(children).map((child) => ({
+    ...child,
+    context: child.context ? merge(value, child.context) : value,
+  }))
+}
