@@ -1,52 +1,45 @@
-import * as acorn from "acorn"
-import * as periscopic from "periscopic"
-import tsPlugin from "acorn-typescript"
-import type { ExpressionStatement, Node } from "estree"
+import { extname } from "node:path"
+import { parseSync, type ParseResult } from "oxc-parser"
+import type { Directive, Program, Statement } from "@oxc-project/types"
+export { GLOBAL_IDENTIFIER, hasGlobalContextReference } from "./context-scope"
 
-export const GLOBAL_IDENTIFIER = "context"
+const TYPESCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"])
+const JSX_EXTENSIONS = new Set([".jsx", ".tsx"])
 
-export const ACORN_OPTIONS = {
-  ecmaVersion: "latest",
-  locations: true,
-  ranges: true,
-  sourceType: "module",
-} satisfies acorn.Options
+function parserLanguage(filePath: string): NonNullable<Parameters<typeof parseSync>[2]>["lang"] {
+  const extension = extname(filePath)
+  if (TYPESCRIPT_EXTENSIONS.has(extension)) {
+    return JSX_EXTENSIONS.has(extension) ? "tsx" : "ts"
+  }
 
-// @ts-expect-error acorn-typescript extends the parser dynamically.
-const parser = acorn.Parser.extend(tsPlugin())
-
-export function parseModule(code: string): Node {
-  // @ts-expect-error acorn returns an ESTree-compatible module node here.
-  return parser.parse(code, ACORN_OPTIONS)
+  return JSX_EXTENSIONS.has(extension) ? "jsx" : "js"
 }
 
-export function hasGlobalContextReference(node: Node): boolean {
-  return periscopic.analyze(node).globals.has(GLOBAL_IDENTIFIER)
+function isDirective(statement: Directive | Statement): statement is Directive {
+  return statement.type === "ExpressionStatement" && typeof statement.directive === "string"
 }
 
-function isDirective(statement: Node): statement is ExpressionStatement {
-  return (
-    statement.type === "ExpressionStatement" &&
-    statement.expression.type === "Literal" &&
-    typeof statement.expression.value === "string"
-  )
+export function parseModule(code: string, filePath: string): ParseResult {
+  return parseSync(filePath, code, {
+    astType: "ts",
+    lang: parserLanguage(filePath),
+    range: true,
+    sourceType: "module",
+  })
 }
 
 export function splitDirectivePrologue(
   code: string,
-  ast: Node,
+  program: Program,
 ): Readonly<{ prologue: string; body: string }> {
-  if (ast.type !== "Program") {
-    return { body: code, prologue: "" }
-  }
-
   let boundary = 0
-  for (const statement of ast.body) {
-    if (!isDirective(statement) || !statement.range) {
+
+  for (const statement of program.body) {
+    if (!isDirective(statement)) {
       break
     }
 
-    boundary = statement.range[1]
+    boundary = statement.end
   }
 
   if (boundary === 0) {

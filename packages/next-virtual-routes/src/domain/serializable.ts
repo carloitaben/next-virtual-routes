@@ -6,7 +6,11 @@ type SerializableContextValue =
   | boolean
   | Date
   | ReadonlyArray<SerializableContextValue>
-  | { readonly [key: string]: SerializableContextValue }
+  | SerializableContext
+
+type SerializableContext = {
+  readonly [key: string]: SerializableContextValue
+}
 
 function isPlainObject(value: object): boolean {
   const prototype = Object.getPrototypeOf(value)
@@ -68,6 +72,10 @@ function assertSerializableValue(
   seen.delete(value)
 }
 
-export function assertContextSerializable(value: unknown): void {
+export function assertContextSerializable(value: unknown): asserts value is SerializableContext {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Context must be a plain object")
+  }
+
   assertSerializableValue(value, "context", new Set<object>())
 }

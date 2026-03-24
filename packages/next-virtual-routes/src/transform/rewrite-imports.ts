@@ -1,9 +1,6 @@
 import { dirname, relative, resolve } from "node:path"
+import type { DynamicImport, ParseResult, ValueSpan } from "oxc-parser"
 import MagicString from "magic-string"
-import { walk } from "zimmerframe"
-import type { ExportAllDeclaration, ExportNamedDeclaration, ImportDeclaration, ImportExpression, Literal, Node } from "estree"
-
-type StringLiteralNode = Literal & { value: string }
 
 type RewriteImportOptions = Readonly<{
   outputFile: string
@@ -16,16 +13,10 @@ function isRelativeSpecifier(specifier: string): boolean {
 
 function toImportSpecifier(path: string): string {
   const normalized = path.replaceAll("\\", "/")
-  if (normalized.startsWith(".")) {
-    return normalized
-  }
-  return `./${normalized}`
+  return normalized.startsWith(".") ? normalized : `./${normalized}`
 }
 
-function rewriteSpecifier(
-  specifier: string,
-  options: RewriteImportOptions,
-): string {
+function rewriteSpecifier(specifier: string, options: RewriteImportOptions): string {
   const absoluteTarget = resolve(dirname(options.templateFile), specifier)
   const rewritten = relative(dirname(options.outputFile), absoluteTarget)
   return toImportSpecifier(rewritten)
@@ -33,53 +24,55 @@ function rewriteSpecifier(
 
 function updateLiteral(
   magicString: MagicString,
-  literal: StringLiteralNode,
+  request: ValueSpan,
   options: RewriteImportOptions,
 ): void {
-  if (!literal.range || !isRelativeSpecifier(literal.value)) {
+  if (!isRelativeSpecifier(request.value)) {
+    return
+  }
+
+  magicString.update(request.start, request.end, JSON.stringify(rewriteSpecifier(request.value, options)))
+}
+
+function updateDynamicImport(
+  code: string,
+  magicString: MagicString,
+  dynamicImport: DynamicImport,
+  options: RewriteImportOptions,
+): void {
+  const request = code.slice(dynamicImport.moduleRequest.start, dynamicImport.moduleRequest.end)
+  const value = JSON.parse(request)
+
+  if (typeof value !== "string" || !isRelativeSpecifier(value)) {
     return
   }
 
   magicString.update(
-    literal.range[0],
-    literal.range[1],
-    JSON.stringify(rewriteSpecifier(literal.value, options)),
+    dynamicImport.moduleRequest.start,
+    dynamicImport.moduleRequest.end,
+    JSON.stringify(rewriteSpecifier(value, options)),
   )
 }
 
-function isStringLiteralNode(
-  node: Literal | null | undefined,
-): node is StringLiteralNode {
-  return node !== null && node !== undefined && typeof node.value === "string" && Array.isArray(node.range)
-}
-
 export function rewriteRelativeImports(
+  code: string,
   magicString: MagicString,
-  ast: Node,
+  parsed: ParseResult,
   options: RewriteImportOptions,
-): string {
-  walk(ast, null, {
-    ExportAllDeclaration(node: ExportAllDeclaration) {
-      if (isStringLiteralNode(node.source)) {
-        updateLiteral(magicString, node.source, options)
-      }
-    },
-    ExportNamedDeclaration(node: ExportNamedDeclaration) {
-      if (isStringLiteralNode(node.source)) {
-        updateLiteral(magicString, node.source, options)
-      }
-    },
-    ImportDeclaration(node: ImportDeclaration) {
-      if (isStringLiteralNode(node.source)) {
-        updateLiteral(magicString, node.source, options)
-      }
-    },
-    ImportExpression(node: ImportExpression) {
-      if (node.source.type === "Literal" && isStringLiteralNode(node.source)) {
-        updateLiteral(magicString, node.source, options)
-      }
-    },
-  })
+): void {
+  for (const statement of parsed.module.staticImports) {
+    updateLiteral(magicString, statement.moduleRequest, options)
+  }
 
-  return magicString.toString()
+  for (const statement of parsed.module.staticExports) {
+    for (const entry of statement.entries) {
+      if (entry.moduleRequest) {
+        updateLiteral(magicString, entry.moduleRequest, options)
+      }
+    }
+  }
+
+  for (const dynamicImport of parsed.module.dynamicImports) {
+    updateDynamicImport(code, magicString, dynamicImport, options)
+  }
 }

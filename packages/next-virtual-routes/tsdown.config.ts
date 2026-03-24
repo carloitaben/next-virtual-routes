@@ -1,20 +1,18 @@
+import { fileURLToPath } from "url"
+import { automd } from "automd"
 import { defineConfig } from "tsdown"
-import { generateDocumentation } from "tsdoc-markdown"
+
+const packageDir = fileURLToPath(new URL(".", import.meta.url))
 
 export default defineConfig({
+  inputOptions: {
+    resolve: {},
+  },
   hooks: {
-    "build:done": () => {
-      generateDocumentation({
-        inputFiles: ["./src/plugin.ts", "./src/lib.ts"],
-        outputFile: "./README.md",
-        buildOptions: {
-          explore: false,
-          types: true,
-        },
-        markdownOptions: {
-          emoji: null,
-          headingLevel: "###",
-        },
+    "build:done": async () => {
+      await automd({
+        dir: packageDir,
+        input: "README.md",
       })
     },
   },

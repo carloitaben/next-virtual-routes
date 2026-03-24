@@ -1,24 +1,43 @@
-import { dirname, resolve } from "node:path"
-import { Console, Effect, Exit, FileSystem, Path, Ref, Semaphore, Stream } from "effect"
+import { dirname, relative, resolve } from "node:path"
+import { Cause, Console, Effect, Exit, FileSystem, Path, Ref, Schema, Semaphore, Stream } from "effect"
 import type { ResolvedRoutesConfig } from "../domain/config"
-import type { PlannedRoute, RoutePlan } from "../domain/plan"
+import { formatBuildError } from "../domain/errors"
+import type { PlannedRoute, RoutePlan, RoutePlanWarning } from "../domain/plan"
 import { MissingTemplateError, RoutesLockError } from "../domain/errors"
+import type { GenerationKind } from "../hooks"
 import { shouldTransformTemplate } from "../transform/file-kind"
 import { transform } from "../transform/pipeline"
+import {
+  notifyGenerationEnd,
+  notifyGenerationError,
+  notifyGenerationStart,
+  notifyRouteGenerated,
+  RoutesHookError,
+} from "./hooks"
 import { GlobService } from "./services"
 
-type LockMetadata = Readonly<{
-  cwd: string
-  pid: number
-  startedAt: string
-  version: string
-}>
+const LockMetadataSchema = Schema.Struct({
+  cwd: Schema.String,
+  pid: Schema.Number,
+  startedAt: Schema.String,
+})
+
+type LockMetadata = Schema.Schema.Type<typeof LockMetadataSchema>
+
+const decodeLockMetadata = Schema.decodeUnknownSync(
+  Schema.fromJsonString(LockMetadataSchema),
+)
 
 export type GenerationResult = Readonly<{
   generatedPaths: ReadonlyArray<string>
 }>
 
 export type RuntimeEnvironment = FileSystem.FileSystem | Path.Path | GlobService
+
+type GenerationRun = Readonly<{
+  kind: GenerationKind
+  routes: ReadonlyArray<PlannedRoute>
+}>
 
 function isProcessRunning(pid: number): boolean {
   try {
@@ -31,26 +50,10 @@ function isProcessRunning(pid: number): boolean {
 
 function parseLockMetadata(contents: string): LockMetadata | undefined {
   try {
-    const value = JSON.parse(contents)
-    if (
-      typeof value === "object" &&
-      value !== null &&
-      "pid" in value &&
-      typeof value.pid === "number" &&
-      "cwd" in value &&
-      typeof value.cwd === "string" &&
-      "startedAt" in value &&
-      typeof value.startedAt === "string" &&
-      "version" in value &&
-      typeof value.version === "string"
-    ) {
-      return value
-    }
+    return decodeLockMetadata(contents)
   } catch {
     return undefined
   }
-
-  return undefined
 }
 
 function lockContents(config: ResolvedRoutesConfig): string {
@@ -58,7 +61,6 @@ function lockContents(config: ResolvedRoutesConfig): string {
     cwd: config.cwd,
     pid: process.pid,
     startedAt: new Date().toISOString(),
-    version: "0.0.0",
   }
 
   return JSON.stringify(metadata, null, 2)
@@ -70,6 +72,20 @@ function logInfo(enabled: boolean, ...parts: ReadonlyArray<unknown>) {
 
 function logWarn(enabled: boolean, ...parts: ReadonlyArray<unknown>) {
   return enabled ? Console.warn(...parts) : Effect.void
+}
+
+function formatPlanWarning(warning: RoutePlanWarning): string {
+  switch (warning._tag) {
+    case "DuplicateRoutePathWarning":
+      return `Skipping duplicate configured route at ${warning.path}; keeping ${warning.keptTemplatePath} and ignoring ${warning.skippedTemplatePath}`
+  }
+}
+
+function logPlanWarnings(plan: RoutePlan) {
+  return Effect.forEach(plan.warnings, (warning) => Console.warn(formatPlanWarning(warning)), {
+    concurrency: "unbounded",
+    discard: true,
+  })
 }
 
 function acquireLock(config: ResolvedRoutesConfig) {
@@ -104,7 +120,7 @@ function acquireLock(config: ResolvedRoutesConfig) {
         ? `pid ${metadata.pid} since ${metadata.startedAt}`
         : "another process"
 
-        return yield* Effect.fail(
+      return yield* Effect.fail(
         new RoutesLockError({
           lockFile: absoluteLockPath,
           message: `next-virtual-routes is locked by ${owner}. Remove ${absoluteLockPath} if this is stale.`,
@@ -159,6 +175,7 @@ function ensureTemplateExists(route: PlannedRoute) {
 function generateRoute(
   route: PlannedRoute,
   config: ResolvedRoutesConfig,
+  kind: GenerationKind,
   generatedPaths: Ref.Ref<Set<string>>,
 ) {
   return Effect.gen(function* () {
@@ -195,8 +212,63 @@ function generateRoute(
     }
 
     yield* Ref.update(generatedPaths, (paths) => new Set(paths).add(route.absoluteOutputPath))
+    yield* notifyRouteGenerated(config.hooks, {
+      kind,
+      path: route.outputPath,
+      templatePath: route.templatePath,
+    })
 
     return true
+  })
+}
+
+function runGenerationBatch(
+  config: ResolvedRoutesConfig,
+  run: GenerationRun,
+  generatedPaths: Ref.Ref<Set<string>>,
+): Effect.Effect<GenerationResult, unknown, RuntimeEnvironment> {
+  return Effect.gen(function* () {
+    yield* notifyGenerationStart(config.hooks, {
+      cwd: config.cwd,
+      kind: run.kind,
+      routeCount: run.routes.length,
+    })
+
+    const attempt = yield* Effect.exit(
+      Effect.forEach(
+        run.routes,
+        (route) => generateRoute(route, config, run.kind, generatedPaths),
+        { concurrency: "unbounded" },
+      ),
+    )
+
+    if (Exit.isFailure(attempt)) {
+      const error = Cause.squash(attempt.cause)
+
+      if (error instanceof RoutesHookError) {
+        return yield* Effect.fail(error.cause)
+      }
+
+      const formattedError = formatBuildError(error)
+      yield* notifyGenerationError(config.hooks, {
+        error: formattedError,
+        kind: run.kind,
+      })
+      return yield* Effect.fail(error)
+    }
+
+    const generated = run.routes
+      .filter((_, index) => attempt.value[index])
+      .map((route) => route.absoluteOutputPath)
+
+    yield* notifyGenerationEnd(config.hooks, {
+      generatedPaths: generated.map((path) => relative(config.cwd, path)),
+      kind: run.kind,
+    })
+
+    return {
+      generatedPaths: generated,
+    }
   })
 }
 
@@ -208,43 +280,35 @@ export function generateRoutesProgram(
     Effect.gen(function* () {
       yield* acquireLock(config)
       yield* runCleanup(config)
+      yield* logPlanWarnings(plan)
       const generatedPaths = yield* Ref.make(new Set<string>())
-      const results = yield* Effect.forEach(
-        plan.routes,
-        (route) => generateRoute(route, config, generatedPaths),
-        { concurrency: "unbounded" },
+      const result = yield* runGenerationBatch(
+        config,
+        {
+          kind: "initial",
+          routes: plan.routes,
+        },
+        generatedPaths,
       )
 
-      const generated = plan.routes
-        .filter((_, index) => results[index])
-        .map((route) => route.absoluteOutputPath)
+      yield* logInfo(config.logEnabled, `Generated ${result.generatedPaths.length} virtual routes`)
 
-      yield* logInfo(config.logEnabled, `Generated ${generated.length} virtual routes`)
-
-      return {
-        generatedPaths: generated,
-      }
+      return result
     }),
   )
 }
 
-function buildTemplateIndex(config: ResolvedRoutesConfig, plan: RoutePlan) {
+function buildTemplateIndex(plan: RoutePlan) {
   const index = new Map<string, Array<PlannedRoute>>()
 
   for (const route of plan.routes) {
-    const absoluteKey = route.absoluteTemplatePath
-    const relativeKey = resolve(config.cwd, route.templatePath)
-    const absoluteRoutes = index.get(absoluteKey) ?? []
-    absoluteRoutes.push(route)
-    index.set(absoluteKey, absoluteRoutes)
+    const keys = new Set([route.absoluteTemplatePath, route.templatePath])
 
-    const relativeRoutes = index.get(relativeKey) ?? []
-    relativeRoutes.push(route)
-    index.set(relativeKey, relativeRoutes)
-
-    const rawRoutes = index.get(route.templatePath) ?? []
-    rawRoutes.push(route)
-    index.set(route.templatePath, rawRoutes)
+    for (const key of keys) {
+      const routes = index.get(key) ?? []
+      routes.push(route)
+      index.set(key, routes)
+    }
   }
 
   return index
@@ -254,16 +318,19 @@ export function watchRoutesProgram(
   config: ResolvedRoutesConfig,
   plan: RoutePlan,
   initialGeneratedPaths: ReadonlyArray<string>,
+  onReady: () => void,
 ): Effect.Effect<void, unknown, RuntimeEnvironment> {
   return Effect.scoped(
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const semaphore = yield* Semaphore.make(1)
       const generatedPaths = yield* Ref.make(new Set(initialGeneratedPaths))
-      const templateIndex = buildTemplateIndex(config, plan)
+      const templateIndex = buildTemplateIndex(plan)
 
       yield* acquireLock(config)
+      yield* logPlanWarnings(plan)
       yield* logInfo(config.logEnabled, "Watching virtual route templates")
+      yield* Effect.sync(onReady)
 
       yield* Stream.runForEach(fs.watch(config.cwd), (event) => {
         const routes = [event.path, resolve(config.cwd, event.path)].flatMap(
@@ -275,9 +342,22 @@ export function watchRoutesProgram(
         }
 
         return semaphore.withPermits(1)(
-          Effect.forEach(routes, (route) =>
-            generateRoute(route, config, generatedPaths),
-          ).pipe(Effect.asVoid),
+          runGenerationBatch(
+            config,
+            {
+              kind: "watch",
+              routes,
+            },
+            generatedPaths,
+          ).pipe(
+            Effect.tap((result) =>
+              logInfo(config.logEnabled, `Generated ${result.generatedPaths.length} virtual routes`),
+            ),
+            Effect.asVoid,
+            Effect.catch((error) =>
+              Console.error(formatBuildError(error).message),
+            ),
+          ),
         )
       })
     }),

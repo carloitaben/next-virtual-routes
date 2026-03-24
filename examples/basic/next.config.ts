@@ -1,4 +1,4 @@
-import { NextConfig } from "next"
+import type { NextConfig } from "next"
 import { route, withRoutes } from "next-virtual-routes"
 
 const nextConfig: NextConfig = {

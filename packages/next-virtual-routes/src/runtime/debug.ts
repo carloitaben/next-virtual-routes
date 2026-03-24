@@ -1,5 +1,9 @@
+import { Schema } from "effect"
+
+const decodeDebugValue = Schema.decodeUnknownSync(Schema.optional(Schema.String))
+
 function debugValue(): string | undefined {
-  const value = process.env.DEBUG?.trim()
+  const value = decodeDebugValue(process.env.DEBUG)?.trim()
   return value && value.length > 0 ? value : undefined
 }
 

@@ -1,4 +1,4 @@
-import fg from "fast-glob"
+import { glob } from "tinyglobby"
 import { Effect, Layer, ServiceMap } from "effect"
 
 export class GlobService extends ServiceMap.Service<GlobService, {
@@ -10,13 +10,16 @@ export const GlobLive = Layer.effect(GlobService)(
     match: (patterns, cwd) =>
       Effect.tryPromise({
         catch: (error) => new Error(`Failed to expand cleanup globs: ${String(error)}`),
-        try: () =>
-          fg([...patterns], {
+        try: async () => {
+          const matches = await glob([...patterns], {
             absolute: true,
             cwd,
             dot: true,
             onlyFiles: false,
-          }),
+          })
+
+          return [...new Set(matches)].sort()
+        },
       }),
   }),
 )

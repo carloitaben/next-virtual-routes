@@ -1,15 +1,27 @@
 import type { NextConfig } from "next"
 import { Console, Effect, Fiber, Layer, ManagedRuntime } from "effect"
-import type { RoutesInput } from "./domain/config"
+import type { RoutesConfig, RoutesInput } from "./domain/config"
+import type { RoutesHooks } from "./hooks"
 import { resolveConfig } from "./domain/config"
 import { formatBuildError } from "./domain/errors"
 import { buildRoutePlan } from "./domain/plan"
 import { RuntimeLive } from "./runtime/layers"
 import {
   generateRoutesProgram,
+  type GenerationResult,
   type RuntimeEnvironment,
   watchRoutesProgram,
 } from "./runtime/programs"
+
+export type {
+  GenerationEndEvent,
+  GenerationErrorEvent,
+  GenerationKind,
+  GenerationStartEvent,
+  RouteGeneratedEvent,
+  RoutesHooks,
+} from "./hooks"
+export type { RoutesConfig, RoutesDefinition } from "./domain/config"
 
 type NextConfigFactory = (
   ...args: ReadonlyArray<unknown>
@@ -19,6 +31,7 @@ type NextConfigInput = NextConfig | NextConfigFactory
 
 type ActiveWatcher = Readonly<{
   fingerprint: string
+  hooks: RoutesHooks | undefined
   runtime: ManagedRuntime.ManagedRuntime<RuntimeEnvironment, never>
   fiber: Fiber.Fiber<void, never>
 }>
@@ -52,6 +65,18 @@ function watcherFingerprint(
   })
 }
 
+function sameHooks(
+  left: RoutesHooks | undefined,
+  right: RoutesHooks | undefined,
+): boolean {
+  return (
+    left?.onGenerationStart === right?.onGenerationStart &&
+    left?.onRouteGenerated === right?.onRouteGenerated &&
+    left?.onGenerationEnd === right?.onGenerationEnd &&
+    left?.onError === right?.onError
+  )
+}
+
 async function stopWatcher(): Promise<void> {
   if (!activeWatcher) {
     return
@@ -73,7 +98,10 @@ async function ensureWatcher(
   }
 
   const fingerprint = watcherFingerprint(config)
-  if (activeWatcher?.fingerprint === fingerprint) {
+  if (
+    activeWatcher?.fingerprint === fingerprint &&
+    sameHooks(activeWatcher.hooks, config.hooks)
+  ) {
     return
   }
 
@@ -81,26 +109,68 @@ async function ensureWatcher(
 
   const runtime = runtimeConfig.managedRuntime()
   const plan = buildRoutePlan(config)
-  const fiber = runtime.runFork(
-    watchRoutesProgram(config, plan, generatedPaths).pipe(
-      Effect.catch((error) => Console.error(formatBuildError(error).message)),
-    ),
-  )
+  const watcherReady = new Promise<void>((resolve) => {
+    const fiber = runtime.runFork(
+      watchRoutesProgram(config, plan, generatedPaths, resolve).pipe(
+        Effect.catch((error) => Console.error(formatBuildError(error).message)),
+      ),
+    )
 
-  activeWatcher = {
-    fiber,
-    fingerprint,
-    runtime,
+    activeWatcher = {
+      fiber,
+      fingerprint,
+      hooks: config.hooks,
+      runtime,
+    }
+  })
+  await watcherReady
+}
+
+function shouldReuseActiveWatcher(
+  config: Awaited<ReturnType<typeof resolveConfig>>,
+): boolean {
+  return (
+    config.watch &&
+    activeWatcher?.fingerprint === watcherFingerprint(config) &&
+    sameHooks(activeWatcher.hooks, config.hooks)
+  )
+}
+
+function reuseGenerationResult(): GenerationResult {
+  return {
+    generatedPaths: [],
   }
 }
 
-async function runGeneration(input: RoutesInput, runtimeConfig: InternalRuntime) {
+function shouldSkipGenerationForProcess(): boolean {
+  return process.argv.some((argument) => argument.includes("next/dist/telemetry/detached-flush"))
+}
+
+async function runGeneration(
+  input: RoutesInput,
+  runtimeConfig: InternalRuntime,
+) {
+  if (shouldSkipGenerationForProcess()) {
+    return reuseGenerationResult()
+  }
+
   const config = await resolveConfig(input)
+
+  if (shouldReuseActiveWatcher(config)) {
+    return reuseGenerationResult()
+  }
+
+  if (activeWatcher) {
+    await stopWatcher()
+  }
+
   const plan = buildRoutePlan(config)
 
   try {
     const result = await Effect.runPromise(
-      generateRoutesProgram(config, plan).pipe(Effect.provide(runtimeConfig.layer)),
+      generateRoutesProgram(config, plan).pipe(
+        Effect.provide(runtimeConfig.layer),
+      ),
     )
 
     await ensureWatcher(config, result.generatedPaths, runtimeConfig)
@@ -110,11 +180,44 @@ async function runGeneration(input: RoutesInput, runtimeConfig: InternalRuntime)
   }
 }
 
-export async function generateRoutes(input: RoutesInput): Promise<void> {
+/**
+ * Generates route files immediately.
+ *
+ * Use this when you need to control route generation outside `withRoutes`.
+ *
+ * @group api
+ *
+ * @example
+ * ```ts
+ * await generateRoutes({
+ *   routes: [route("blog/page.tsx", "src/templates/page.tsx")],
+ * })
+ * ```
+ */
+export async function generateRoutes(input: RoutesConfig): Promise<void> {
   await runGeneration(input, RuntimeDefault)
 }
 
-export function withRoutes(routes: RoutesInput) {
+/**
+ * @internal
+ */
+export async function resetRoutesWatcherForTesting(): Promise<void> {
+  await stopWatcher()
+}
+
+/**
+ * Wraps a Next.js config and generates routes before Next loads it.
+ *
+ * @group api
+ *
+ * @example
+ * ```ts
+ * export default withRoutes({
+ *   routes: [route("blog/page.tsx", "src/templates/page.tsx")],
+ * })({})
+ * ```
+ */
+export function withRoutes(routes: RoutesConfig) {
   return function applyRoutes(nextConfig: NextConfigInput = {}) {
     return async (...args: ReadonlyArray<unknown>): Promise<NextConfig> => {
       await runGeneration(routes, RuntimeDefault)

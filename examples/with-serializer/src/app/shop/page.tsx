@@ -1,3 +1,5 @@
+const context = { "path": "src/app/shop/page.tsx" }
+
 import { getRouteContext } from "@/lib/routes"
 
 const routeContext = getRouteContext(context.path)

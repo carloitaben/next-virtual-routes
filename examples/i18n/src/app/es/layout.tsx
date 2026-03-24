@@ -1,13 +1,9 @@
-const context = {
-  "language": "es"
-}
+const context = { "language": "es", "path": "src/app/es/layout.tsx" }
 
 import type { Metadata } from "next"
 import "@/globals.css"
 
-export const metadata: Metadata = {
-  "title": "es"
-}
+export const metadata: Metadata = { "title": "es" }
 
 export default function RootLayout({
   children,

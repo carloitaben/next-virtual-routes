@@ -7,23 +7,11 @@ export class InvalidRoutesConfigError extends Data.TaggedError(
   readonly cause?: unknown
 }> {}
 
-export class DuplicateRoutePathError extends Data.TaggedError(
-  "DuplicateRoutePathError",
-)<{
-  readonly path: string
-}> {}
-
 export class MissingTemplateError extends Data.TaggedError(
   "MissingTemplateError",
 )<{
   readonly templatePath: string
   readonly routePath: string
-}> {}
-
-export class RouteCollisionError extends Data.TaggedError(
-  "RouteCollisionError",
-)<{
-  readonly path: string
 }> {}
 
 export class MissingRouteContextError extends Data.TaggedError(
@@ -48,10 +36,6 @@ export function toError(error: unknown): Error {
 export function formatBuildError(error: unknown): Error {
   if (error instanceof InvalidRoutesConfigError) {
     return new Error(error.message, { cause: error.cause })
-  }
-
-  if (error instanceof DuplicateRoutePathError) {
-    return new Error(`Duplicate generated route path: ${error.path}`)
   }
 
   if (error instanceof MissingTemplateError) {

@@ -1,208 +1,274 @@
-import type { Node } from "estree"
+import type {
+  ChainExpression,
+  IdentifierName,
+  MemberExpression,
+  Node,
+  ObjectExpression,
+  SequenceExpression,
+  TemplateLiteral,
+  UnaryExpression,
+} from "@oxc-project/types"
 
-type Vars = Record<PropertyKey, unknown>
+type Vars = Record<string, unknown>
+type ValueKey = string | number | symbol
+type BinaryLike = Extract<Node, { type: "BinaryExpression" }>
+
+function isIdentifierNode(node: Node): node is IdentifierName {
+  return node.type === "Identifier" && typeof node.name === "string"
+}
 
 export class EvaluationFailureError extends Error {
   constructor(node: Node) {
-    super(`Unsupported node type: ${node.type}`)
+    super(`Unsupported node type: "${node.type}"`)
     this.name = "EvaluationFailureError"
     this.cause = node
   }
 }
 
-function evaluateBinary(operator: string, left: unknown, right: unknown): unknown {
-  switch (operator) {
-    case "!=":
-      return left != right
-    case "!==":
-      return left !== right
-    case "%":
-      return Number(left) % Number(right)
-    case "*":
-      return Number(left) * Number(right)
+function evaluateBinary(node: BinaryLike, vars: Vars): unknown {
+  if (node.operator === "in" && node.left.type === "PrivateIdentifier") {
+    throw new EvaluationFailureError(node)
+  }
+
+  const leftValue = evaluate(node.left, vars)
+  const rightValue = evaluate(node.right, vars)
+
+  switch (node.operator) {
     case "+":
-      return String(left) + String(right)
+      return typeof leftValue === "string" || typeof rightValue === "string"
+        ? String(leftValue) + String(rightValue)
+        : Number(leftValue) + Number(rightValue)
     case "-":
-      return Number(left) - Number(right)
+      return Number(leftValue) - Number(rightValue)
+    case "*":
+      return Number(leftValue) * Number(rightValue)
     case "/":
-      return Number(left) / Number(right)
-    case "<":
-      return Number(left) < Number(right)
-    case "<=":
-      return Number(left) <= Number(right)
+      return Number(leftValue) / Number(rightValue)
+    case "%":
+      return Number(leftValue) % Number(rightValue)
     case "==":
-      return left == right
+      return leftValue == rightValue
     case "===":
-      return left === right
+      return leftValue === rightValue
+    case "!=":
+      return leftValue != rightValue
+    case "!==":
+      return leftValue !== rightValue
+    case "<":
+      return Number(leftValue) < Number(rightValue)
+    case "<=":
+      return Number(leftValue) <= Number(rightValue)
     case ">":
-      return Number(left) > Number(right)
+      return Number(leftValue) > Number(rightValue)
     case ">=":
-      return Number(left) >= Number(right)
+      return Number(leftValue) >= Number(rightValue)
     default:
-      throw new Error(`Unsupported binary operator: ${operator}`)
+      throw new EvaluationFailureError(node)
   }
 }
 
-function evaluateLogical(operator: string, left: unknown, right: () => unknown): unknown {
-  switch (operator) {
-    case "&&":
-      return left ? right() : left
-    case "??":
-      return left ?? right()
-    case "||":
-      return left ? left : right()
-    default:
-      throw new Error(`Unsupported logical operator: ${operator}`)
+function evaluateIdentifier(node: IdentifierName, vars: Vars): unknown {
+  if (!(node.name in vars)) {
+    throw new EvaluationFailureError(node)
   }
+
+  return vars[node.name]
 }
 
-function evaluateObjectKey(node: Extract<Node, { type: "Property" }>, vars: Vars): PropertyKey {
-  const value = node.computed || node.key.type !== "Identifier"
-    ? evaluate(node.key, vars)
-    : node.key.name
+function evaluatePropertyKey(node: Node, vars: Vars): ValueKey {
+  if (isIdentifierNode(node)) {
+    return node.name
+  }
 
-  if (typeof value === "number" || typeof value === "string" || typeof value === "symbol") {
+  if (node.type === "PrivateIdentifier") {
+    throw new EvaluationFailureError(node)
+  }
+
+  const value = evaluate(node, vars)
+  if (typeof value === "string" || typeof value === "number" || typeof value === "symbol") {
     return value
   }
 
   throw new EvaluationFailureError(node)
 }
 
+function evaluateMember(node: MemberExpression, vars: Vars): unknown {
+  const object = evaluate(node.object, vars)
+  if (object === null || (typeof object !== "object" && typeof object !== "function")) {
+    throw new EvaluationFailureError(node)
+  }
+
+  if (!node.computed && node.property.type === "Identifier") {
+    return Reflect.get(object, node.property.name)
+  }
+
+  return Reflect.get(object, evaluatePropertyKey(node.property, vars))
+}
+
+function evaluateObject(node: ObjectExpression, vars: Vars): Record<ValueKey, unknown> {
+  const object: Record<ValueKey, unknown> = {}
+
+  for (const property of node.properties) {
+    if (property.type === "SpreadElement") {
+      const value = evaluate(property.argument, vars)
+      if (value === null || typeof value !== "object") {
+        throw new EvaluationFailureError(property)
+      }
+
+      Object.assign(object, value)
+      continue
+    }
+
+    const value = property.shorthand && isIdentifierNode(property.key)
+      ? evaluateIdentifier(property.key, vars)
+      : evaluate(property.value, vars)
+    object[evaluatePropertyKey(property.key, vars)] = value
+  }
+
+  return object
+}
+
+function evaluateTemplate(node: TemplateLiteral, vars: Vars): string {
+  let result = ""
+
+  for (const [index, quasi] of node.quasis.entries()) {
+    result += quasi.value.cooked ?? ""
+    const expression = node.expressions[index]
+    if (expression) {
+      result += String(evaluate(expression, vars))
+    }
+  }
+
+  return result
+}
+
+function evaluateUnary(node: UnaryExpression, vars: Vars): unknown {
+  const argument = evaluate(node.argument, vars)
+
+  switch (node.operator) {
+    case "+":
+      return Number(argument)
+    case "-":
+      return -Number(argument)
+    case "~":
+      return ~Number(argument)
+    case "!":
+      return !argument
+    case "typeof":
+      return typeof argument
+    default:
+      throw new EvaluationFailureError(node)
+  }
+}
+
+function evaluateSequence(node: SequenceExpression, vars: Vars): unknown {
+  const expression = node.expressions[node.expressions.length - 1]
+  if (!expression) {
+    throw new EvaluationFailureError(node)
+  }
+
+  return evaluate(expression, vars)
+}
+
+function evaluateChain(node: ChainExpression, vars: Vars): unknown {
+  const expression = node.expression
+  if (expression.type !== "MemberExpression") {
+    throw new EvaluationFailureError(node)
+  }
+
+  const object = evaluate(expression.object, vars)
+  if (object == null) {
+    return undefined
+  }
+
+  if (!expression.computed && expression.property.type === "Identifier") {
+    return Reflect.get(object, expression.property.name)
+  }
+
+  return Reflect.get(object, evaluatePropertyKey(expression.property, vars))
+}
+
 export function evaluate(node: Node, vars: Vars = {}): unknown {
   switch (node.type) {
+    case "Program": {
+      const body = node.body.map((statement) => evaluate(statement, vars))
+      return body.length > 1 ? body : body[0]
+    }
+    case "ExportNamedDeclaration":
+      return node.declaration ? evaluate(node.declaration, vars) : undefined
+    case "VariableDeclaration": {
+      const values = node.declarations.map((declaration) => evaluate(declaration, vars))
+      return values.length > 1 ? values : values[0]
+    }
+    case "VariableDeclarator":
+      return node.init ? evaluate(node.init, vars) : undefined
+    case "ExpressionStatement":
+      return evaluate(node.expression, vars)
+    case "Literal":
+      return node.value
+    case "UnaryExpression":
+      return evaluateUnary(node, vars)
     case "ArrayExpression":
       return node.elements.map((element) => {
-        if (element === null) {
+        if (!element) {
           throw new EvaluationFailureError(node)
         }
 
-        if (element.type === "SpreadElement") {
-          const value = evaluate(element.argument, vars)
-          if (!Array.isArray(value)) {
-            throw new EvaluationFailureError(element)
-          }
-          return value
-        }
-
-        return [evaluate(element, vars)]
+        return element.type === "SpreadElement"
+          ? (() => {
+            const value = evaluate(element.argument, vars)
+            if (!Array.isArray(value)) {
+              throw new EvaluationFailureError(element)
+            }
+            return value
+          })()
+          : evaluate(element, vars)
       }).flat()
+    case "ObjectExpression":
+      return evaluateObject(node, vars)
     case "BinaryExpression":
-      return evaluateBinary(
-        node.operator,
-        evaluate(node.left, vars),
-        evaluate(node.right, vars),
-      )
-    case "ChainExpression":
-      return evaluate(node.expression, vars)
-    case "ConditionalExpression":
-      return evaluate(node.test, vars)
-        ? evaluate(node.consequent, vars)
-        : evaluate(node.alternate, vars)
-    case "ExpressionStatement":
-      return evaluate(node.expression, vars)
-    case "ExportNamedDeclaration":
-      return node.declaration ? evaluate(node.declaration, vars) : undefined
-    case "Identifier":
-      if (!(node.name in vars)) {
-        throw new EvaluationFailureError(node)
-      }
-
-      return vars[node.name]
-    case "Literal":
-      return node.value
-    case "LogicalExpression":
-      return evaluateLogical(node.operator, evaluate(node.left, vars), () =>
-        evaluate(node.right, vars),
-      )
-    case "MemberExpression": {
-      const object = evaluate(node.object, vars)
-      const property = node.computed
-        ? evaluate(node.property, vars)
-        : node.property.type === "Identifier"
-          ? node.property.name
-          : evaluate(node.property, vars)
-
-      if ((typeof object !== "object" && typeof object !== "function") || object === null) {
-        throw new EvaluationFailureError(node)
-      }
-
-      if (
-        typeof property !== "number" &&
-        typeof property !== "string" &&
-        typeof property !== "symbol"
-      ) {
-        throw new EvaluationFailureError(node)
-      }
-
-      return Reflect.get(object, property)
-    }
-    case "ObjectExpression": {
-      const object: Record<PropertyKey, unknown> = {}
-
-      for (const property of node.properties) {
-        if (property.type === "SpreadElement") {
-          const value = evaluate(property.argument, vars)
-          if (value === null || typeof value !== "object") {
-            throw new EvaluationFailureError(property)
-          }
-
-          Object.assign(object, value)
-          continue
-        }
-
-        object[evaluateObjectKey(property, vars)] = evaluate(property.value, vars)
-      }
-
-      return object
-    }
-    case "Program": {
-      const result = node.body.map((statement) => evaluate(statement, vars))
-      return result.length > 1 ? result : result[0]
-    }
-    case "SequenceExpression": {
-      const expression = node.expressions[node.expressions.length - 1]
-      if (!expression) {
-        throw new EvaluationFailureError(node)
-      }
-      return evaluate(expression, vars)
-    }
-    case "TemplateLiteral": {
-      let result = ""
-
-      for (const [index, quasi] of node.quasis.entries()) {
-        result += quasi.value.cooked ?? ""
-        const expression = node.expressions[index]
-        if (expression) {
-          result += String(evaluate(expression, vars))
-        }
-      }
-
-      return result
-    }
-    case "UnaryExpression": {
-      const value = evaluate(node.argument, vars)
-
+      return evaluateBinary(node, vars)
+    case "LogicalExpression": {
+      const left = evaluate(node.left, vars)
       switch (node.operator) {
-        case "!":
-          return !value
-        case "+":
-          return Number(value)
-        case "-":
-          return -Number(value)
-        case "~":
-          return ~Number(value)
-        case "typeof":
-          return typeof value
+        case "&&":
+          return left ? evaluate(node.right, vars) : left
+        case "||":
+          return left ? left : evaluate(node.right, vars)
+        case "??":
+          return left ?? evaluate(node.right, vars)
         default:
           throw new EvaluationFailureError(node)
       }
     }
-    case "VariableDeclaration": {
-      const result = node.declarations.map((declaration) => evaluate(declaration, vars))
-      return result.length > 1 ? result : result[0]
-    }
-    case "VariableDeclarator":
-      return node.init ? evaluate(node.init, vars) : undefined
+    case "Identifier":
+      return isIdentifierNode(node)
+        ? evaluateIdentifier(node, vars)
+        : (() => {
+          throw new EvaluationFailureError(node)
+        })()
+    case "CallExpression":
+    case "ImportExpression":
+      throw new EvaluationFailureError(node)
+    case "MemberExpression":
+      return evaluateMember(node, vars)
+    case "ConditionalExpression":
+      return evaluate(node.test, vars)
+        ? evaluate(node.consequent, vars)
+        : evaluate(node.alternate, vars)
+    case "TemplateLiteral":
+      return evaluateTemplate(node, vars)
+    case "ChainExpression":
+      return evaluateChain(node, vars)
+    case "ParenthesizedExpression":
+      return evaluate(node.expression, vars)
+    case "TSAsExpression":
+    case "TSNonNullExpression":
+    case "TSSatisfiesExpression":
+    case "TSTypeAssertion":
+      return evaluate(node.expression, vars)
+    case "SequenceExpression":
+      return evaluateSequence(node, vars)
     default:
       throw new EvaluationFailureError(node)
   }

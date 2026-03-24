@@ -25,7 +25,8 @@
     "next.js",
     "programmatic routes",
     "code-based routes",
-    "app router"
+    "app router",
+    "pages router"
   ],
   "exports": {
     ".": "./src/index.ts"
@@ -47,9 +48,7 @@
     "build": "tsdown"
   },
   "peerDependencies": {
-    "next": ">=14",
-    "prettier": ">=3",
-    "typescript": ">5"
+    "next": ">=14"
   },
   "peerDependenciesMeta": {
     "prettier": {
@@ -57,35 +56,24 @@
     }
   },
   "dependencies": {
-    "acorn": "^8.15.0",
-    "acorn-typescript": "^1.4.13",
-    "@effect/platform-bun": "4.0.0-beta.35",
     "@effect/platform-node": "4.0.0-beta.35",
-    "chokidar": "^4.0.1",
-    "debug": "^4.3.7",
     "effect": "4.0.0-beta.35",
-    "fast-glob": "^3.3.2",
-    "fs-extra": "^11.2.0",
     "magic-string": "^0.30.12",
-    "next": "15.0.3",
-    "periscopic": "^4.0.2",
-    "prettier": "^3.3.3",
-    "ts-deepmerge": "^7.0.1",
-    "valibot": "^1.1.0",
-    "zimmerframe": "^1.1.2"
+    "oxc-parser": "^0.121.0",
+    "tinyglobby": "^0.2.14",
+    "ts-deepmerge": "^7.0.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.2.2",
-    "@types/estree": "^1.0.8",
-    "@effect/vitest": "^0.25.1",
-    "@swc/core": "^1.13.5",
-    "@types/debug": "^4.1.12",
-    "@types/fs-extra": "^11.0.4",
-    "@types/node": "^20",
+    "@effect/vitest": "4.0.0-beta.35",
+    "@oxc-project/types": "^0.121.0",
+    "@types/node": "^20.19.11",
+    "automd": "^0.4.3",
     "memfs": "^4.49.0",
-    "tsdoc-markdown": "^0.6.3",
+    "next": "16.2.1",
+    "prettier": "^3.3.3",
     "tsdown": "^0.12.7",
     "typescript": "^5.9.2",
-    "vitest": "^2.1.5"
+    "vite": "^7",
+    "vitest": "^4.1.0"
   }
 }

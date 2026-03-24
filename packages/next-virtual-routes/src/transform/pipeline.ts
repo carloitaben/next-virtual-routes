@@ -1,17 +1,16 @@
+import type { VariableDeclaration } from "@oxc-project/types"
 import MagicString from "magic-string"
-import { walk } from "zimmerframe"
-import type { Node } from "estree"
 import type { Context } from "../lib"
 import { MissingRouteContextError } from "../domain/errors"
-import { EvaluationFailureError, evaluate, serialize } from "./evaluate"
+import { EvaluationFailureError, evaluate } from "./evaluate"
 import { injectContextDeclaration } from "./inject-context"
 import {
-  GLOBAL_IDENTIFIER,
   hasGlobalContextReference,
   parseModule,
   splitDirectivePrologue,
 } from "./parse"
 import { rewriteRelativeImports } from "./rewrite-imports"
+import { serialize } from "./evaluate"
 
 type TransformOptions = Readonly<{
   banner: string
@@ -28,12 +27,12 @@ function joinSections(sections: ReadonlyArray<string>): string {
 
 function withDirectiveAwarePreludeAndFooter(
   code: string,
-  ast: Node,
+  program: ReturnType<typeof parseModule>["program"],
   banner: string,
   contextDeclaration: string | undefined,
   footer: string,
 ): string {
-  const { body, prologue } = splitDirectivePrologue(code, ast)
+  const { body, prologue } = splitDirectivePrologue(code, program)
   const leadingSections = prologue.length > 0
     ? [prologue, banner, contextDeclaration ?? "", body]
     : [banner, contextDeclaration ?? "", body]
@@ -41,63 +40,58 @@ function withDirectiveAwarePreludeAndFooter(
   return joinSections([...leadingSections, footer])
 }
 
-function staticallyFoldExports(
-  ast: Node,
+function rewriteExportDeclaration(
   magicString: MagicString,
+  declaration: VariableDeclaration,
   routeContext: Context,
 ): void {
-  walk<Node, { evaluate: boolean }>(
-    ast,
-    { evaluate: false },
-    {
-      ExportNamedDeclaration(node, context) {
-        if (!node.declaration || !hasGlobalContextReference(node)) {
-          return context.stop()
-        }
+  for (const declarator of declaration.declarations) {
+    if (!declarator.init) {
+      continue
+    }
 
-        context.next({ evaluate: true })
-      },
-      VariableDeclarator(node, context) {
-        if (!context.state.evaluate || !node.init || !node.init.range) {
-          return context.stop()
-        }
+    try {
+      const evaluation = evaluate(declarator.init, {
+        context: routeContext,
+      })
+      magicString.update(declarator.init.start, declarator.init.end, serialize(evaluation))
+    } catch (error) {
+      if (!(error instanceof EvaluationFailureError)) {
+        throw error
+      }
+    }
+  }
+}
 
-        try {
-          const evaluation = evaluate(node.init, {
-            [GLOBAL_IDENTIFIER]: routeContext,
-          })
-
-          magicString.update(
-            node.init.range[0],
-            node.init.range[1],
-            serialize(evaluation),
-          )
-        } catch (error) {
-          if (!(error instanceof EvaluationFailureError)) {
-            throw error
-          }
-        }
-
-        return context.stop()
-      },
-    },
-  )
+function staticallyFoldExports(
+  magicString: MagicString,
+  program: ReturnType<typeof parseModule>["program"],
+  routeContext: Context,
+): void {
+  for (const statement of program.body) {
+    if (
+      statement.type === "ExportNamedDeclaration"
+      && statement.declaration
+      && statement.declaration.type === "VariableDeclaration"
+    ) {
+      rewriteExportDeclaration(magicString, statement.declaration, routeContext)
+    }
+  }
 }
 
 export function transform(code: string, options: TransformOptions): string {
-  const ast = parseModule(code)
+  const parsed = parseModule(code, options.templateFile)
   const magicString = new MagicString(code)
 
-  rewriteRelativeImports(magicString, ast, {
+  rewriteRelativeImports(code, magicString, parsed, {
     outputFile: options.outputFile,
     templateFile: options.templateFile,
   })
 
-  if (!hasGlobalContextReference(ast)) {
-    const output = magicString.toString()
+  if (!hasGlobalContextReference(parsed.program)) {
     return withDirectiveAwarePreludeAndFooter(
-      output,
-      ast,
+      magicString.toString(),
+      parsed.program,
       options.banner,
       undefined,
       options.footer,
@@ -108,17 +102,17 @@ export function transform(code: string, options: TransformOptions): string {
     throw new MissingRouteContextError({ routePath: options.routePath })
   }
 
-  staticallyFoldExports(ast, magicString, options.routeContext)
+  staticallyFoldExports(magicString, parsed.program, options.routeContext)
 
   const transformedCode = magicString.toString()
-  const transformedAst = parseModule(transformedCode)
-  const contextDeclaration = hasGlobalContextReference(transformedAst)
+  const transformedParsed = parseModule(transformedCode, options.outputFile)
+  const contextDeclaration = hasGlobalContextReference(transformedParsed.program)
     ? injectContextDeclaration(options.routeContext)
     : undefined
 
   return withDirectiveAwarePreludeAndFooter(
     transformedCode,
-    transformedAst,
+    transformedParsed.program,
     options.banner,
     contextDeclaration,
     options.footer,
