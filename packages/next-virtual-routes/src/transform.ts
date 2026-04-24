@@ -18,7 +18,9 @@ export const ACORN_OPTIONS = {
 } satisfies acorn.Options
 
 // @ts-expect-error
-const parser = acorn.Parser.extend(tsPlugin())
+const parser = acorn.Parser.extend(tsPlugin({
+  allowSatisfies: true
+}))
 
 function getGlobalIdentifier(node: Node) {
   const analysis = periscopic.analyze(node)
